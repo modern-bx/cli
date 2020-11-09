@@ -1,0 +1,40 @@
+{
+    "alias": "cli.phar",
+    "compactors": [
+        "KevinGH\\Box\\Compactor\\PhpScoper"
+    ],
+    "datetime": "build-datetime",
+    "files": [
+        "README.md",
+        "LICENSE.txt",
+        "config/autoload.php",
+        "config/cli.php",
+        "config.yml"
+    ],
+    "finder": [
+        {
+            "name": "*.php",
+            "in": "src",
+            "exclude": [
+                "Compiler"
+            ]
+        },
+        {
+            "name": "*.php",
+            "in": "vendor",
+            "exclude": [
+                "tests",
+                "test"
+            ]
+        }
+    ],
+    "git": "build-version",
+    "main": "bin/cli.php",
+    "output": "dist/cli.phar",
+    "replacements": {
+        "compiler-name": "modern-bx/cli-compiler",
+        "build-name": "modern-bx/cli",
+        "build-bundles": ""
+    },
+    "exclude-dev-files": false
+}

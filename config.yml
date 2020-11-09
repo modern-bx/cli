@@ -1,0 +1,20 @@
+cli:
+  whitelist:
+    classes:
+      # main
+      - CMain
+      - CUser
+      - CBitrixComponent
+      - CBitrixComponentTemplate
+      # iblock
+      - CIBlock
+      - CIBlockElement
+      - CIBlockSection
+      # sale
+      - CSaleOrderChange
+      - CSaleOrderPropsValue
+      - CSaleStatus
+      # form
+      - CForm
+      - CFormAnswer
+      - CFormField

@@ -1,0 +1,14 @@
+<?xml version="1.0"?>
+<ruleset name="PSR2R">
+    <description>PSR-2 для Bitrix</description>
+    <rule ref="PSR2">
+        <exclude name="Generic.PHP.DisallowShortOpenTag"/>
+        <exclude name="Generic.Files.LineEndings"/>
+    </rule>
+    <rule ref="Generic.PHP.ForbiddenFunctions">
+        <properties>
+            <property name="forbiddenFunctions" type="array"
+                      value="var_dump=>null,d=>null, dd=>null, eval=>null, print_r=>null"/>
+        </properties>
+    </rule>
+</ruleset>

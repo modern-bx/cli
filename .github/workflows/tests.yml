@@ -1,0 +1,48 @@
+name: Тесты
+
+on:
+  push:
+    branches:
+      - "*"
+  pull_request:
+    branches:
+      - "*"
+      
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    runs-on: ubuntu-24.04
+    steps:
+    - name: Настройка PHP
+      uses: shivammathur/setup-php@v2
+      with:
+        php-version: '8.1'
+        extensions: http
+
+    - uses: actions/checkout@v4
+
+    - name: Пробрасываем auth.json для Composer
+      run: echo '${{ secrets.COMPOSER_AUTH }}' > $GITHUB_WORKSPACE/auth.json
+
+    - name: Валидация composer.json и composer.lock
+      run: composer validate
+
+    - name: Кешируем зависимости
+      id: composer-cache
+      uses: actions/cache@v4
+      with:
+        path: vendor
+        key: ${{ runner.os }}-php-${{ hashFiles('**/composer.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-php-
+
+    - name: Устанавливаем зависимости
+      run: composer install --prefer-dist --no-progress
+
+    - name: Линтер
+      run: composer run-script lint
+
+    - name: Статический анализатор
+      run: composer run-script analyze

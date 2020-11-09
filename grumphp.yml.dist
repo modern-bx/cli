@@ -1,0 +1,9 @@
+grumphp:
+  tasks:
+    phpcs:
+      standard: ./phpcs.xml.dist
+      ignore_patterns: [ ./vendor/* ]
+    phpstan:
+      level: 9
+      ignore_patterns: [ ./vendor/* ]
+      triggered_by: [ 'php' ]
