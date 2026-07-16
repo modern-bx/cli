@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "853747320fc0e04c74b82d04307d56a7",
+    "content-hash": "e80c5feb42f8e04eaac53b6e872acfb6",
     "packages": [
         {
             "name": "jakeasmith/http_build_url",
@@ -43,157 +43,6 @@
                 "source": "https://github.com/jakeasmith/http_build_url"
             },
             "time": "2017-05-01T15:36:40+00:00"
-        },
-        {
-            "name": "modern-bx/common-functions",
-            "version": "dev-master",
-            "source": {
-                "type": "git",
-                "url": "git@github.com:modern-bx/common-functions.git",
-                "reference": "66cbccec49a27f723321f17ddca281336afc3772"
-            },
-            "dist": {
-                "type": "zip",
-                "url": "https://api.github.com/repos/modern-bx/common-functions/zipball/66cbccec49a27f723321f17ddca281336afc3772",
-                "reference": "66cbccec49a27f723321f17ddca281336afc3772",
-                "shasum": ""
-            },
-            "require": {
-                "ext-json": "*",
-                "ext-mbstring": "*",
-                "php": ">=8.1"
-            },
-            "require-dev": {
-                "phpro/grumphp": "1.15.*",
-                "phpstan/phpstan": "1.10.*",
-                "phpunit/phpunit": "9.4.1",
-                "squizlabs/php_codesniffer": "3.7.2"
-            },
-            "default-branch": true,
-            "type": "library",
-            "autoload": {
-                "files": [
-                    "src/autoload.php"
-                ],
-                "psr-4": {
-                    "ModernBx\\CommonFunctions\\": "src"
-                }
-            },
-            "autoload-dev": {
-                "psr-4": {
-                    "ModernBx\\CommonFunctions\\Tests\\": "tests"
-                }
-            },
-            "scripts": {
-                "grumphp": [
-                    "grumphp run"
-                ],
-                "test": [
-                    "phpunit"
-                ],
-                "coverage": [
-                    "export XDEBUG_MODE=coverage; phpunit --coverage-text --colors=never --coverage-cobertura=coverage.cobertura.xml --log-junit report.xml"
-                ],
-                "analyze": [
-                    "phpstan analyse src tests --memory-limit 256M"
-                ],
-                "lint": [
-                    "phpcs --standard=PSR2 -s src tests"
-                ],
-                "docs": [
-                    "@php tools/phpDocumentor -d src -t docs"
-                ]
-            },
-            "license": [
-                "MIT"
-            ],
-            "authors": [
-                {
-                    "name": "Alexander Selyuchenko",
-                    "email": "alexander.selyuchenko@gmail.com"
-                }
-            ],
-            "description": "Common helpers for Bitrix-based projects",
-            "support": {
-                "source": "https://github.com/modern-bx/common-functions/tree/master",
-                "issues": "https://github.com/modern-bx/common-functions/issues"
-            },
-            "time": "2024-10-12T10:57:29+00:00"
-        },
-        {
-            "name": "modern-bx/url",
-            "version": "dev-master",
-            "source": {
-                "type": "git",
-                "url": "git@github.com:modern-bx/url.git",
-                "reference": "294371d3969ee35b42ead15d8d61c753719e10f2"
-            },
-            "dist": {
-                "type": "zip",
-                "url": "https://api.github.com/repos/modern-bx/url/zipball/294371d3969ee35b42ead15d8d61c753719e10f2",
-                "reference": "294371d3969ee35b42ead15d8d61c753719e10f2",
-                "shasum": ""
-            },
-            "require": {
-                "ext-json": "*",
-                "ext-mbstring": "*",
-                "jakeasmith/http_build_url": "dev-master",
-                "modern-bx/common-functions": "dev-master",
-                "php": ">=8.1"
-            },
-            "require-dev": {
-                "phpro/grumphp": "1.15.*",
-                "phpstan/phpstan": "1.10.*",
-                "phpunit/phpunit": "9.4.1",
-                "squizlabs/php_codesniffer": "3.7.2"
-            },
-            "default-branch": true,
-            "type": "library",
-            "autoload": {
-                "psr-4": {
-                    "ModernBx\\": "src"
-                }
-            },
-            "autoload-dev": {
-                "psr-4": {
-                    "ModernBx\\Tests\\": "tests"
-                }
-            },
-            "scripts": {
-                "grumphp": [
-                    "grumphp run"
-                ],
-                "test": [
-                    "phpunit"
-                ],
-                "coverage": [
-                    "export XDEBUG_MODE=coverage; phpunit --coverage-text --colors=never --coverage-cobertura=coverage.cobertura.xml --log-junit report.xml"
-                ],
-                "analyze": [
-                    "phpstan analyse src tests --memory-limit 256M"
-                ],
-                "lint": [
-                    "phpcs --standard=PSR2 -s src tests"
-                ],
-                "docs": [
-                    "@php tools/phpDocumentor -d src -t docs"
-                ]
-            },
-            "license": [
-                "MIT"
-            ],
-            "authors": [
-                {
-                    "name": "Alexander Selyuchenko",
-                    "email": "alexander.selyuchenko@gmail.com"
-                }
-            ],
-            "description": "Helper classes for url manipulation",
-            "support": {
-                "source": "https://github.com/modern-bx/url/tree/master",
-                "issues": "https://github.com/modern-bx/url/issues"
-            },
-            "time": "2024-10-12T10:58:12+00:00"
         },
         {
             "name": "psr/container",
@@ -2983,12 +2832,11 @@
     "aliases": [],
     "minimum-stability": "dev",
     "stability-flags": {
-        "symfony/finder": 20,
+        "jakeasmith/http_build_url": 20,
         "symfony/config": 20,
-        "symfony/yaml": 20,
         "symfony/filesystem": 20,
-        "modern-bx/common-functions": 20,
-        "modern-bx/url": 20
+        "symfony/finder": 20,
+        "symfony/yaml": 20
     },
     "prefer-stable": false,
     "prefer-lowest": false,
@@ -2997,9 +2845,9 @@
         "ext-json": "*",
         "ext-mbstring": "*"
     },
-    "platform-dev": [],
+    "platform-dev": {},
     "platform-overrides": {
         "php": "8.1"
     },
-    "plugin-api-version": "2.6.0"
+    "plugin-api-version": "2.9.0"
 }

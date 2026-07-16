@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace ModernBx\Cli\App\Console\Command\Bx;
 
 use ModernBx\Cli\App\Console\Command\BxCommand;
-use ModernBx\Cli\App\Console\Mixin\ComposerAware;
+use ModernBx\Cli\App\Console\Mixin\Common\ComposerAware;
 use ModernBx\Cli\App\Service\ClassAliasLoader;
 
 use Symfony\Component\Console\Input\InputInterface;
