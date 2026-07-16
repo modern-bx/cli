@@ -35,6 +35,12 @@ class SettingGetCommand extends BxCommand
                         InputOption::VALUE_NONE,
                         "Read .settings_extra.php instead of .settings.php",
                     ),
+                    new InputOption(
+                        'pretty',
+                        null,
+                        InputOption::VALUE_NONE,
+                        "Pretty-print JSON output",
+                    ),
                     new InputArgument(
                         'path',
                         InputArgument::REQUIRED,
@@ -63,7 +69,12 @@ class SettingGetCommand extends BxCommand
         }
 
         $value = $this->getSettingValue($settings, $this->getPathSegments($path));
+        $flags = JSON_UNESCAPED_UNICODE;
 
-        $this->printer->info((string) to_json($value));
+        if ($input->getOption("pretty")) {
+            $flags |= JSON_PRETTY_PRINT;
+        }
+
+        $this->printer->info((string) to_json($value, $flags));
     }
 }
