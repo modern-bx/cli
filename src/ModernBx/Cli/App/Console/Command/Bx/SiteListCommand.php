@@ -6,7 +6,7 @@ declare(strict_types=1);
 
 namespace ModernBx\Cli\App\Console\Command\Bx;
 
-use ModernBx\Cli\App\Console\Mixin\IO;
+use ModernBx\Cli\App\Console\Mixin\Common\IO;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 

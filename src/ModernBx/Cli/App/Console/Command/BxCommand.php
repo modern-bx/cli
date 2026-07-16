@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace ModernBx\Cli\App\Console\Command;
 
-use ModernBx\Cli\App\Console\Mixin\BitrixAware;
+use ModernBx\Cli\App\Console\Mixin\Bx\BitrixAware;
 use ModernBx\Url\UrlImmutable;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;

@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace ModernBx\Cli\App\Console\Command\Bx;
 
 use ModernBx\Cli\App\Console\Command\BxCommand;
-use ModernBx\Cli\App\Console\Mixin\SettingFile;
+use ModernBx\Cli\App\Console\Mixin\Bx\SettingFile;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputDefinition;
 use Symfony\Component\Console\Input\InputInterface;
