@@ -27,26 +27,26 @@ class SiteGetCommand extends KernelCommand
     protected function configure(): void
     {
         $this
-            ->setDescription("Print Bitrix site fields")
-            ->setHelp("Print Bitrix site fields as JSON using D7 SiteTable::getList")
+            ->setDescription($this->trans("command.site_get.description"))
+            ->setHelp($this->trans("command.site_get.help"))
             ->setDefinition(
                 new InputDefinition([
                     new InputOption(
                         'select',
                         null,
                         InputOption::VALUE_REQUIRED,
-                        "JSON for SiteTable::getList select parameter",
+                        $this->trans("option.site.select"),
                     ),
                     new InputOption(
                         'pretty',
                         null,
                         InputOption::VALUE_NONE,
-                        "Pretty-print JSON output",
+                        $this->trans("option.json.pretty_bx"),
                     ),
                     new InputArgument(
                         'id',
                         InputArgument::REQUIRED,
-                        "Site ID",
+                        $this->trans("argument.site.id"),
                     ),
                 ]),
             );
@@ -65,7 +65,7 @@ class SiteGetCommand extends KernelCommand
         $siteId = $input->getArgument("id");
 
         if (!is_string($siteId)) {
-            throw new \Exception("Site ID must be a string.", static::CODE_INVALID_ARGUMENT_VALUE);
+            throw new \Exception($this->trans("error.site.id_string"), static::CODE_INVALID_ARGUMENT_VALUE);
         }
 
         $query = [
@@ -76,7 +76,10 @@ class SiteGetCommand extends KernelCommand
 
         if ($select !== null) {
             if (!is_string($select)) {
-                throw new \Exception("Option --select must be a JSON string.", static::CODE_INVALID_OPTION_VALUE);
+                throw new \Exception(
+                    $this->trans("error.option_json_string", ["%option%" => "select"]),
+                    static::CODE_INVALID_OPTION_VALUE
+                );
             }
 
             $query["select"] = $this->decodeSelectOption($select);
@@ -110,7 +113,10 @@ class SiteGetCommand extends KernelCommand
 
         if (json_last_error() !== JSON_ERROR_NONE) {
             throw new \Exception(
-                "Option --select contains invalid JSON: " . json_last_error_msg(),
+                $this->trans("error.option_invalid_json", [
+                    "%option%" => "select",
+                    "%message%" => json_last_error_msg(),
+                ]),
                 static::CODE_INVALID_OPTION_VALUE
             );
         }

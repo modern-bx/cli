@@ -22,24 +22,24 @@ class EnvSetCommand extends AppCommand
     protected function configure(): void
     {
         $this
-            ->setDescription("Set a value in dotenv file")
-            ->setHelp("Updates or appends a key-value pair in a dotenv file and prints the resulting content.")
+            ->setDescription($this->trans("command.env_set.description"))
+            ->setHelp($this->trans("command.env_set.help"))
             ->setDefinition(
                 new InputDefinition([
                     new InputArgument(
                         'file',
                         InputArgument::REQUIRED,
-                        "Path to dotenv file",
+                        $this->trans("argument.env.file"),
                     ),
                     new InputArgument(
                         'key',
                         InputArgument::REQUIRED,
-                        "Environment variable name",
+                        $this->trans("argument.env.key"),
                     ),
                     new InputArgument(
                         'value',
                         InputArgument::REQUIRED,
-                        "Environment variable value",
+                        $this->trans("argument.env.value"),
                     ),
                 ]),
             );
@@ -67,14 +67,14 @@ class EnvSetCommand extends AppCommand
             $content = file_get_contents($file);
 
             if ($content === false) {
-                throw new \RuntimeException("Unable to read dotenv file.", static::CODE_IO_ERROR);
+                throw new \RuntimeException($this->trans("error.dotenv.read"), static::CODE_IO_ERROR);
             }
         }
 
         $content = EnvFile::set($content, $key, $value);
 
         if (file_put_contents($file, $content) === false) {
-            throw new \RuntimeException("Unable to write dotenv file.", static::CODE_IO_ERROR);
+            throw new \RuntimeException($this->trans("error.dotenv.write"), static::CODE_IO_ERROR);
         }
 
         $this->printer->info($content);

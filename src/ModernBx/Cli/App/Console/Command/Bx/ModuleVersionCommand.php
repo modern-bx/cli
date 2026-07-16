@@ -21,14 +21,14 @@ class ModuleVersionCommand extends KernelCommand
     protected function configure(): void
     {
         $this
-            ->setDescription("Get Bitrix module version")
-            ->setHelp("Print version of the Bitrix module. Multiple module codes are allowed")
+            ->setDescription($this->trans("command.module_version.description"))
+            ->setHelp($this->trans("command.module_version.help"))
             ->setDefinition(
                 new InputDefinition([
                     new InputArgument(
                         'module',
                         InputArgument::IS_ARRAY,
-                        "List of module vendor codes",
+                        $this->trans("argument.module.list"),
                     ),
                 ])
             );

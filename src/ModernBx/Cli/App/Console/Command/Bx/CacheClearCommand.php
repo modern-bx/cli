@@ -25,14 +25,14 @@ class CacheClearCommand extends BxCommand
     protected function configure(): void
     {
         $this
-            ->setDescription("Clear Bitrix cache")
-            ->setHelp("Delete the contents of 'cache', 'managed_cache' or 'stack_cache'")
+            ->setDescription($this->trans("command.cache_clear.description"))
+            ->setHelp($this->trans("command.cache_clear.help"))
             ->setDefinition(
                 new InputDefinition([
                     new InputArgument(
                         'directory',
                         InputArgument::IS_ARRAY,
-                        "Cache directories to be cleaned up",
+                        $this->trans("argument.cache.directory"),
                     ),
                 ])
             );
@@ -53,7 +53,10 @@ class CacheClearCommand extends BxCommand
 
         foreach ($directories as $directory) {
             if (!in_array($directory, $this->getValidDirectories())) {
-                throw new \Exception("Invalid cache directory", static::CODE_INVALID_ARGUMENT_VALUE);
+                throw new \Exception(
+                    $this->trans("error.cache.invalid_directory"),
+                    static::CODE_INVALID_ARGUMENT_VALUE
+                );
             }
         }
 

@@ -25,26 +25,26 @@ class SettingGetCommand extends BxCommand
     protected function configure(): void
     {
         $this
-            ->setDescription("Get Bitrix settings value")
-            ->setHelp("Print a value from .settings.php or .settings_extra.php. Skip the root value segment in path")
+            ->setDescription($this->trans("command.setting_get.description"))
+            ->setHelp($this->trans("command.setting_get.help"))
             ->setDefinition(
                 new InputDefinition([
                     new InputOption(
                         'extra',
                         null,
                         InputOption::VALUE_NONE,
-                        "Read .settings_extra.php instead of .settings.php",
+                        $this->trans("option.setting.extra_read"),
                     ),
                     new InputOption(
                         'pretty',
                         null,
                         InputOption::VALUE_NONE,
-                        "Pretty-print JSON output",
+                        $this->trans("option.json.pretty_bx"),
                     ),
                     new InputArgument(
                         'path',
                         InputArgument::REQUIRED,
-                        "Dot-separated settings path without the root value segment",
+                        $this->trans("argument.setting.path"),
                     ),
                 ]),
             );
@@ -65,7 +65,7 @@ class SettingGetCommand extends BxCommand
         $path = $input->getArgument("path");
 
         if (!is_string($path)) {
-            throw new \Exception("Setting path must be a string.", static::CODE_INVALID_ARGUMENT_VALUE);
+            throw new \Exception($this->trans("error.setting.path_string"), static::CODE_INVALID_ARGUMENT_VALUE);
         }
 
         $value = $this->getSettingValue($settings, $this->getPathSegments($path));

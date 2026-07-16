@@ -14,6 +14,9 @@ use Symfony\Component\Console\Application;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Definition;
 use Symfony\Component\DependencyInjection\Reference;
+use Symfony\Component\Translation\Loader\PhpFileLoader;
+use Symfony\Component\Translation\Translator;
+use Symfony\Contracts\Translation\TranslatorInterface;
 
 final class DefaultContainerBuilder
 {
@@ -33,6 +36,8 @@ final class DefaultContainerBuilder
         }
 
         $this->containerBuilder = new ContainerBuilder();
+
+        $this->registerTranslator($this->containerBuilder);
 
         $this->containerBuilder
             ->autowire(DynamicCommandLoader::class)
@@ -65,6 +70,27 @@ final class DefaultContainerBuilder
         $this->containerBuilder->compile();
 
         return $this->containerBuilder;
+    }
+
+    /**
+     * @param ContainerBuilder $containerBuilder
+     */
+    protected function registerTranslator(ContainerBuilder $containerBuilder): void
+    {
+        $locale = $_SERVER["APP_LOCALE"] ?? getenv("APP_LOCALE") ?: "ru";
+
+        $containerBuilder
+            ->autowire(PhpFileLoader::class, PhpFileLoader::class);
+
+        $containerBuilder
+            ->autowire(Translator::class, Translator::class)
+            ->addArgument($locale)
+            ->addMethodCall("addLoader", ["php", new Reference(PhpFileLoader::class)])
+            ->addMethodCall("addResource", ["php", $_SERVER["DOCUMENT_ROOT"] . "/lang/ru/messages.php", "ru"])
+            ->addMethodCall("addResource", ["php", $_SERVER["DOCUMENT_ROOT"] . "/lang/en/messages.php", "en"])
+            ->addMethodCall("setFallbackLocales", [["ru", "en"]]);
+
+        $containerBuilder->setAlias(TranslatorInterface::class, Translator::class);
     }
 
     /**

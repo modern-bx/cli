@@ -26,11 +26,9 @@ class JsonSetCommand extends AppCommand
     protected function configure(): void
     {
         $this
-            ->setDescription("Set value in JSON read from stdin")
+            ->setDescription($this->trans("command.json_set.description"))
             ->setHelp(
-                "Reads JSON from stdin, decodes the value argument as JSON, " .
-                "sets it at the specified dot-separated path, and prints the resulting JSON. " .
-                "Use an empty path to replace the whole input value. Escape dots in keys with a backslash."
+                $this->trans("command.json_set.help")
             )
             ->setDefinition(
                 new InputDefinition([
@@ -38,17 +36,17 @@ class JsonSetCommand extends AppCommand
                         'pretty',
                         'p',
                         InputOption::VALUE_NONE,
-                        "Pretty-print output JSON",
+                        $this->trans("option.json.pretty"),
                     ),
                     new InputArgument(
                         'path',
                         InputArgument::REQUIRED,
-                        "Dot-separated path to the JSON value that should be changed",
+                        $this->trans("argument.json.path.set"),
                     ),
                     new InputArgument(
                         'value',
                         InputArgument::REQUIRED,
-                        "New value encoded as JSON",
+                        $this->trans("argument.json.value"),
                     ),
                 ]),
             );
@@ -68,7 +66,7 @@ class JsonSetCommand extends AppCommand
         $json = file_get_contents("php://stdin");
 
         if ($json === false) {
-            throw new \RuntimeException("Unable to read JSON from stdin.", static::CODE_IO_ERROR);
+            throw new \RuntimeException($this->trans("error.json.stdin_read"), static::CODE_IO_ERROR);
         }
 
         /** @var string $path */

@@ -39,7 +39,7 @@ class BxCommand extends AppCommand
 
         if (!$bxRoot) {
             throw new \Exception(
-                "Bitrix installation has not been found.",
+                $this->trans("error.bitrix.not_found"),
                 static::CODE_BX_ROOT_NOT_FOUND
             );
         }

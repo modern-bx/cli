@@ -24,19 +24,19 @@ class SiteUpdateCommand extends KernelCommand
     protected function configure(): void
     {
         $this
-            ->setDescription("Update Bitrix site fields")
-            ->setHelp("Update Bitrix site fields using D7 SiteTable::update")
+            ->setDescription($this->trans("command.site_update.description"))
+            ->setHelp($this->trans("command.site_update.help"))
             ->setDefinition(
                 new InputDefinition([
                     new InputArgument(
                         'LID',
                         InputArgument::REQUIRED,
-                        "Site LID",
+                        $this->trans("argument.site.lid"),
                     ),
                     new InputArgument(
                         'values',
                         InputArgument::REQUIRED,
-                        "JSON object with SiteTable::update values",
+                        $this->trans("argument.site.update_values"),
                     ),
                 ]),
             );
@@ -56,11 +56,11 @@ class SiteUpdateCommand extends KernelCommand
         $values = $input->getArgument("values");
 
         if (!is_string($lid)) {
-            throw new \Exception("Site LID must be a string.", static::CODE_INVALID_ARGUMENT_VALUE);
+            throw new \Exception($this->trans("error.site.lid_string"), static::CODE_INVALID_ARGUMENT_VALUE);
         }
 
         if (!is_string($values)) {
-            throw new \Exception("Update values must be a JSON object string.", static::CODE_INVALID_ARGUMENT_VALUE);
+            throw new \Exception($this->trans("error.site.update_json_string"), static::CODE_INVALID_ARGUMENT_VALUE);
         }
 
         /** @var array<string, mixed> $decodedValues */
@@ -86,13 +86,13 @@ class SiteUpdateCommand extends KernelCommand
 
         if (json_last_error() !== JSON_ERROR_NONE) {
             throw new \Exception(
-                "Update values contain invalid JSON: " . json_last_error_msg(),
+                $this->trans("error.site.update_invalid_json", ["%message%" => json_last_error_msg()]),
                 static::CODE_INVALID_ARGUMENT_VALUE
             );
         }
 
         if (!is_array($decoded) || array_is_list($decoded)) {
-            throw new \Exception("Update values must be a JSON object.", static::CODE_INVALID_ARGUMENT_VALUE);
+            throw new \Exception($this->trans("error.site.update_object"), static::CODE_INVALID_ARGUMENT_VALUE);
         }
 
         /** @var array<string, mixed> $decoded */

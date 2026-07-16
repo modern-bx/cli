@@ -22,19 +22,19 @@ class EnvGetCommand extends AppCommand
     protected function configure(): void
     {
         $this
-            ->setDescription("Get a value from dotenv file")
-            ->setHelp("Reads a dotenv file and prints the decoded value for the specified key.")
+            ->setDescription($this->trans("command.env_get.description"))
+            ->setHelp($this->trans("command.env_get.help"))
             ->setDefinition(
                 new InputDefinition([
                     new InputArgument(
                         'file',
                         InputArgument::REQUIRED,
-                        "Path to dotenv file",
+                        $this->trans("argument.env.file"),
                     ),
                     new InputArgument(
                         'key',
                         InputArgument::REQUIRED,
-                        "Environment variable name",
+                        $this->trans("argument.env.key"),
                     ),
                 ]),
             );
@@ -57,7 +57,7 @@ class EnvGetCommand extends AppCommand
         $content = file_get_contents($file);
 
         if ($content === false) {
-            throw new \RuntimeException("Unable to read dotenv file.", static::CODE_IO_ERROR);
+            throw new \RuntimeException($this->trans("error.dotenv.read"), static::CODE_IO_ERROR);
         }
 
         $this->printer->info((string) EnvFile::get($content, $key));

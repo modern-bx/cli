@@ -24,19 +24,19 @@ class OptionSetCommand extends KernelCommand
     protected function configure(): void
     {
         $this
-            ->setDescription("Set Bitrix module option value")
-            ->setHelp("Set Bitrix module option value")
+            ->setDescription($this->trans("command.option_set.description"))
+            ->setHelp($this->trans("command.option_set.help"))
             ->setDefinition(
                 new InputDefinition([
                     new InputArgument(
                         'option',
                         InputArgument::REQUIRED,
-                        "Option name. Format: module.option[.lid]",
+                        $this->trans("argument.option.name"),
                     ),
                     new InputArgument(
                         'value',
                         InputArgument::REQUIRED,
-                        "Option value",
+                        $this->trans("argument.option.value"),
                     ),
                 ])
             );

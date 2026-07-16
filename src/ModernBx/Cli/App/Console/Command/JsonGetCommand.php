@@ -26,10 +26,9 @@ class JsonGetCommand extends AppCommand
     protected function configure(): void
     {
         $this
-            ->setDescription("Get value from JSON read from stdin")
+            ->setDescription($this->trans("command.json_get.description"))
             ->setHelp(
-                "Reads JSON from stdin and prints the value at the specified dot-separated path as JSON. " .
-                "Use an empty path to print the whole input value. Escape dots in keys with a backslash."
+                $this->trans("command.json_get.help")
             )
             ->setDefinition(
                 new InputDefinition([
@@ -37,12 +36,12 @@ class JsonGetCommand extends AppCommand
                         'pretty',
                         'p',
                         InputOption::VALUE_NONE,
-                        "Pretty-print output JSON",
+                        $this->trans("option.json.pretty"),
                     ),
                     new InputArgument(
                         'path',
                         InputArgument::REQUIRED,
-                        "Dot-separated path to the requested JSON value",
+                        $this->trans("argument.json.path.get"),
                     ),
                 ]),
             );
@@ -62,7 +61,7 @@ class JsonGetCommand extends AppCommand
         $json = file_get_contents("php://stdin");
 
         if ($json === false) {
-            throw new \RuntimeException("Unable to read JSON from stdin.", static::CODE_IO_ERROR);
+            throw new \RuntimeException($this->trans("error.json.stdin_read"), static::CODE_IO_ERROR);
         }
 
         /** @var string $path */

@@ -9,6 +9,9 @@ use ModernBx\Cli\Common\Console\Printer;
 
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
+use Symfony\Component\Translation\Loader\PhpFileLoader;
+use Symfony\Component\Translation\Translator;
+use Symfony\Contracts\Translation\TranslatorInterface;
 
 class AppCommand extends GenericCommand
 {
@@ -24,9 +27,49 @@ class AppCommand extends GenericCommand
     protected Printer $printer;
 
     /**
+     * @var TranslatorInterface
+     */
+    protected TranslatorInterface $translator;
+
+    /**
      * @var bool
      */
     protected bool $verbose = false;
+
+    /**
+     * @param TranslatorInterface|null $translator
+     */
+    public function __construct(?TranslatorInterface $translator = null)
+    {
+        $this->translator = $translator ?? $this->getDefaultTranslator();
+
+        parent::__construct();
+    }
+
+    /**
+     * @return TranslatorInterface
+     */
+    protected function getDefaultTranslator(): TranslatorInterface
+    {
+        $locale = $_SERVER["APP_LOCALE"] ?? getenv("APP_LOCALE") ?: "ru";
+        $translator = new Translator($locale);
+        $translator->addLoader("php", new PhpFileLoader());
+        $translator->addResource("php", $_SERVER["DOCUMENT_ROOT"] . "/lang/ru/messages.php", "ru");
+        $translator->addResource("php", $_SERVER["DOCUMENT_ROOT"] . "/lang/en/messages.php", "en");
+        $translator->setFallbackLocales(["ru", "en"]);
+
+        return $translator;
+    }
+
+    /**
+     * @param string $key
+     * @param array<string, string> $parameters
+     * @return string
+     */
+    protected function trans(string $key, array $parameters = []): string
+    {
+        return $this->translator->trans($key, $parameters);
+    }
 
     /**
      * @return bool
