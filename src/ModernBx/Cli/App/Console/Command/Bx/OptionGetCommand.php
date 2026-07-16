@@ -27,20 +27,20 @@ class OptionGetCommand extends KernelCommand
     protected function configure(): void
     {
         $this
-            ->setDescription("Get Bitrix module option value")
-            ->setHelp("Print value of the Bitrix module option. Multiple option names are allowed")
+            ->setDescription($this->trans("command.option_get.description"))
+            ->setHelp($this->trans("command.option_get.help"))
             ->setDefinition(
                 new InputDefinition([
                     new InputOption(
                         'unserialize',
                         'u',
                         InputOption::VALUE_NONE,
-                        "Unserialize option value, if possible",
+                        $this->trans("option.option.unserialize"),
                     ),
                     new InputArgument(
                         'option',
                         InputArgument::IS_ARRAY,
-                        "List of module option codes. Format: module.option[.lid]",
+                        $this->trans("argument.option.list"),
                     ),
                 ]),
             );

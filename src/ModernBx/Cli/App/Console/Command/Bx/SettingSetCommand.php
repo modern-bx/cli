@@ -23,25 +23,25 @@ class SettingSetCommand extends BxCommand
     protected function configure(): void
     {
         $this
-            ->setDescription("Set Bitrix settings value")
-            ->setHelp("Set a value in .settings.php or .settings_extra.php. Skip the root value segment in path")
+            ->setDescription($this->trans("command.setting_set.description"))
+            ->setHelp($this->trans("command.setting_set.help"))
             ->setDefinition(
                 new InputDefinition([
                     new InputOption(
                         'extra',
                         null,
                         InputOption::VALUE_NONE,
-                        "Write .settings_extra.php instead of .settings.php",
+                        $this->trans("option.setting.extra_write"),
                     ),
                     new InputArgument(
                         'path',
                         InputArgument::REQUIRED,
-                        "Dot-separated settings path without the root value segment",
+                        $this->trans("argument.setting.path"),
                     ),
                     new InputArgument(
                         'value',
                         InputArgument::REQUIRED,
-                        "New setting value. JSON scalars and structures are decoded; other values are saved as strings",
+                        $this->trans("argument.setting.value"),
                     ),
                 ]),
             );
@@ -63,18 +63,18 @@ class SettingSetCommand extends BxCommand
         $value = $input->getArgument("value");
 
         if (!is_string($path)) {
-            throw new \Exception("Setting path must be a string.", static::CODE_INVALID_ARGUMENT_VALUE);
+            throw new \Exception($this->trans("error.setting.path_string"), static::CODE_INVALID_ARGUMENT_VALUE);
         }
 
         if (!is_string($value)) {
-            throw new \Exception("Setting value must be a string.", static::CODE_INVALID_ARGUMENT_VALUE);
+            throw new \Exception($this->trans("error.setting.value_string"), static::CODE_INVALID_ARGUMENT_VALUE);
         }
 
         $value = $this->decodeValue($value);
 
         $this->setSettingValue($settings, $this->getPathSegments($path), $value);
         $this->saveSettings($settings, $file);
-        $this->printer->info("Settings value has been updated.");
+        $this->printer->info($this->trans("message.setting.updated"));
     }
 
     /**

@@ -26,33 +26,33 @@ class SiteListCommand extends KernelCommand
     protected function configure(): void
     {
         $this
-            ->setDescription("List Bitrix sites")
-            ->setHelp("Print Bitrix sites as JSON rows using D7 SiteTable::getList")
+            ->setDescription($this->trans("command.site_list.description"))
+            ->setHelp($this->trans("command.site_list.help"))
             ->setDefinition(
                 new InputDefinition([
                     new InputOption(
                         'filter',
                         null,
                         InputOption::VALUE_REQUIRED,
-                        "JSON for SiteTable::getList filter parameter",
+                        $this->trans("option.site.filter"),
                     ),
                     new InputOption(
                         'order',
                         null,
                         InputOption::VALUE_REQUIRED,
-                        "JSON for SiteTable::getList order parameter",
+                        $this->trans("option.site.order"),
                     ),
                     new InputOption(
                         'select',
                         null,
                         InputOption::VALUE_REQUIRED,
-                        "JSON for SiteTable::getList select parameter",
+                        $this->trans("option.site.select"),
                     ),
                     new InputOption(
                         'pretty',
                         null,
                         InputOption::VALUE_NONE,
-                        "Pretty-print JSON output",
+                        $this->trans("option.json.pretty_bx"),
                     ),
                 ]),
             );
@@ -79,7 +79,7 @@ class SiteListCommand extends KernelCommand
 
             if (!is_string($value)) {
                 throw new \Exception(
-                    "Option --" . $option . " must be a JSON string.",
+                    $this->trans("error.option_json_string", ["%option%" => $option]),
                     static::CODE_INVALID_OPTION_VALUE
                 );
             }
@@ -114,7 +114,10 @@ class SiteListCommand extends KernelCommand
 
         if (json_last_error() !== JSON_ERROR_NONE) {
             throw new \Exception(
-                "Option --" . $option . " contains invalid JSON: " . json_last_error_msg(),
+                $this->trans("error.option_invalid_json", [
+                    "%option%" => $option,
+                    "%message%" => json_last_error_msg(),
+                ]),
                 static::CODE_INVALID_OPTION_VALUE
             );
         }
