@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace ModernBx\Cli\App\Console\Command\Bx;
 
 use ModernBx\Cli\App\Console\Mixin\Bx\ModuleLifecycle;
+use ModernBx\Cli\App\Console\Mixin\Bx\ModuleLifecycleOutput;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputDefinition;
 use Symfony\Component\Console\Input\InputInterface;
@@ -13,6 +14,7 @@ use Symfony\Component\Console\Output\OutputInterface;
 class ModuleUninstallCommand extends KernelCommand
 {
     use ModuleLifecycle;
+    use ModuleLifecycleOutput;
 
     /**
      * @var string
@@ -45,6 +47,8 @@ class ModuleUninstallCommand extends KernelCommand
     {
         parent::executeInternal($input, $output);
 
-        $this->uninstallModule($this->getModuleCode($input->getArgument("module")));
+        $result = $this->uninstallModule($this->getModuleCode($input->getArgument("module")));
+
+        $this->printModuleLifecycleResult($result);
     }
 }

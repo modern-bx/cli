@@ -10,46 +10,38 @@ trait ModuleLifecycle
 {
     /**
      * @param string $moduleCode
-     * @return void
+     * @return ModuleLifecycleResult
      * @throws \Exception
      */
-    protected function installModule(string $moduleCode): void
+    protected function installModule(string $moduleCode): ModuleLifecycleResult
     {
         /** @phpstan-ignore-next-line */
         if (\Bitrix\Main\ModuleManager::isModuleInstalled($moduleCode)) {
-            $this->printer->put(
-                $this->trans("warning.module.already_installed", ["%module%" => $moduleCode]),
-                "comment"
-            );
-
-            return;
+            return new ModuleLifecycleResult($moduleCode, ModuleLifecycleResult::STATUS_ALREADY_INSTALLED);
         }
 
         $installer = $this->getModuleInstaller($moduleCode);
         $this->callInstallerMethod($installer, 'DoInstall');
-        $this->printer->info($this->trans("message.module.installed", ["%module%" => $moduleCode]));
+
+        return new ModuleLifecycleResult($moduleCode, ModuleLifecycleResult::STATUS_INSTALLED);
     }
 
     /**
      * @param string $moduleCode
-     * @return void
+     * @return ModuleLifecycleResult
      * @throws \Exception
      */
-    protected function uninstallModule(string $moduleCode): void
+    protected function uninstallModule(string $moduleCode): ModuleLifecycleResult
     {
         /** @phpstan-ignore-next-line */
         if (!\Bitrix\Main\ModuleManager::isModuleInstalled($moduleCode)) {
-            $this->printer->put(
-                $this->trans("warning.module.not_installed", ["%module%" => $moduleCode]),
-                "comment"
-            );
-
-            return;
+            return new ModuleLifecycleResult($moduleCode, ModuleLifecycleResult::STATUS_NOT_INSTALLED);
         }
 
         $installer = $this->getModuleInstaller($moduleCode);
         $this->callInstallerMethod($installer, 'DoUninstall');
-        $this->printer->info($this->trans("message.module.uninstalled", ["%module%" => $moduleCode]));
+
+        return new ModuleLifecycleResult($moduleCode, ModuleLifecycleResult::STATUS_UNINSTALLED);
     }
 
     /**
