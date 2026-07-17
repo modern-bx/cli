@@ -8,6 +8,7 @@ use ModernBx\Cli\App\Console\Command\AppCommand;
 use ModernBx\Cli\App\Service\Remote\ProjectRegistry;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 
 class RemoteCommand extends AppCommand
@@ -28,6 +29,7 @@ class RemoteCommand extends AppCommand
         $this
             ->setDescription('Выводит shell-команду для выбора remote в текущей терминальной сессии')
             ->setHelp('Выполните вывод команды через eval, чтобы переменная окружения сохранилась в текущем shell.')
+            ->addOption('unset', null, InputOption::VALUE_NONE, 'Сбросить remote текущей терминальной сессии')
             ->addArgument('remote', InputArgument::OPTIONAL, 'Кодовое имя удаленного проекта');
     }
 
@@ -36,11 +38,20 @@ class RemoteCommand extends AppCommand
         parent::executeInternal($input, $output);
 
         $remote = $input->getArgument('remote');
+        $unset = $input->getOption('unset') === true;
 
-        if ($remote === null) {
+        if ($unset) {
             putenv(static::ENV_REMOTE);
             unset($_SERVER[static::ENV_REMOTE]);
             $this->printer->info('unset ' . static::ENV_REMOTE);
+            return;
+        }
+
+        if ($remote === null) {
+            $sessionRemote = $this->getSessionRemote();
+            $this->printer->info($sessionRemote !== null
+                ? sprintf('Текущий remote: %s', $sessionRemote)
+                : 'Remote текущей терминальной сессии не указан.');
             return;
         }
 
