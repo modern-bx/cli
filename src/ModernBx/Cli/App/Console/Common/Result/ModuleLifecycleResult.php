@@ -14,16 +14,16 @@ final class ModuleLifecycleResult extends AbstractResult
     /**
      * @param string $moduleCode
      * @param ResultStatus $status
-     * @param ResultNotice[] $notices
      * @param ResultWarning[] $warnings
+     * @param ResultNotice[] $notices
      */
     public function __construct(
         string $moduleCode,
         ResultStatus $status,
-        array $notices = [],
-        array $warnings = []
+        array $warnings = [],
+        array $notices = []
     ) {
-        parent::__construct($status, $notices, $warnings);
+        parent::__construct($status, $warnings, $notices);
 
         $this->moduleCode = $moduleCode;
     }

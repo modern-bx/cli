@@ -23,14 +23,14 @@ abstract class AbstractResult implements Result
 
     /**
      * @param ResultStatus $status
-     * @param ResultNotice[] $notices
      * @param ResultWarning[] $warnings
+     * @param ResultNotice[] $notices
      */
-    public function __construct(ResultStatus $status, array $notices = [], array $warnings = [])
+    public function __construct(ResultStatus $status, array $warnings = [], array $notices = [])
     {
         $this->status = $status;
-        $this->notices = $notices;
         $this->warnings = $warnings;
+        $this->notices = $notices;
     }
 
     /**

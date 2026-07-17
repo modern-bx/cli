@@ -25,7 +25,6 @@ trait ModuleLifecycle
             return new ModuleLifecycleResult(
                 $moduleCode,
                 ResultStatus::STATUS_SUCCESS,
-                [],
                 [new ResultWarning(
                     $this->trans("warning.module.already_installed", ["%module%" => $moduleCode]),
                     ModuleLifecycleWarningCode::MODULE_ALREADY_INSTALLED
@@ -51,7 +50,6 @@ trait ModuleLifecycle
             return new ModuleLifecycleResult(
                 $moduleCode,
                 ResultStatus::STATUS_SUCCESS,
-                [],
                 [new ResultWarning(
                     $this->trans("warning.module.not_installed", ["%module%" => $moduleCode]),
                     ModuleLifecycleWarningCode::MODULE_NOT_INSTALLED
