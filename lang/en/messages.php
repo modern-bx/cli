@@ -74,20 +74,20 @@ return [
     'error.site.update_object' => 'Update values must be a JSON object.',
 
     'command.sql_dump.description' => 'Dump project database to a SQL file',
-    'command.sql_dump.help' => 'Creates a MySQL 8.0 SQL dump using PHP only without calling mysqldump. ' .
+    'command.sql_dump.help' => 'Creates a MySQL 8.0/PostgreSQL SQL dump using PHP only without calling mysqldump. ' .
         'Connection settings are read from .settings.php or php_interface/dbconn.php.',
     'argument.sql_dump.file' => 'Path to SQL dump file',
     'error.sql_dump.file_string' => 'SQL dump file path must be a non-empty string.',
     'message.sql_dump.created' => 'SQL dump has been created: %file%',
     'command.sql_apply.description' => 'Execute SQL file in the project database',
-    'command.sql_apply.help' => 'Executes a SQL file in the application MySQL database using PHP only ' .
+    'command.sql_apply.help' => 'Executes a SQL file in the application MySQL/PostgreSQL database using PHP only ' .
         'without external tools.',
     'argument.sql_apply.file' => 'Path to SQL file to execute',
     'error.sql_apply.file_string' => 'SQL file path must be a non-empty string.',
     'message.sql_apply.applied' => 'SQL file has been executed: %file%',
     'command.sql_wipe.description' => 'Delete all data from the project database',
-    'command.sql_wipe.help' => 'Empties all application MySQL database tables with TRUNCATE using PHP only ' .
-        'without external tools.',
+    'command.sql_wipe.help' => 'Empties all application MySQL/PostgreSQL database tables with TRUNCATE ' .
+        'using PHP only without external tools.',
     'message.sql_wipe.done' => 'Data has been removed from tables: %count%',
     'error.bitrix.not_found' => 'Bitrix installation has not been found.',
 ];

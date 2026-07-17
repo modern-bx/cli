@@ -26,11 +26,10 @@ class SqlCommand extends BxCommand
             if (is_array($connection)) {
                 $className = (string) ($connection['className'] ?? '');
 
-                if ($className !== '' && !str_contains(mb_strtolower($className), 'mysql')) {
-                    throw new \Exception('Only MySQL connections are supported by SQL commands now.');
-                }
+                $type = $this->detectType($connection, $className);
 
                 return [
+                    'type' => $type,
                     'host' => $connection['host'] ?? 'localhost',
                     'port' => $connection['port'] ?? 3306,
                     'socket' => $connection['socket'] ?? '',
@@ -43,6 +42,28 @@ class SqlCommand extends BxCommand
         }
 
         return $this->getLegacyConnectionConfig();
+    }
+
+    /**
+     * @param array<string, mixed> $connection
+     * @param string $className
+     * @return string
+     * @throws \Exception
+     */
+    private function detectType(array $connection, string $className): string
+    {
+        $rawType = $connection['type'] ?? $className;
+        $type = mb_strtolower(is_scalar($rawType) ? (string) $rawType : $className);
+
+        if (str_contains($type, 'pgsql') || str_contains($type, 'postgres')) {
+            return 'postgres';
+        }
+
+        if ($type === '' || str_contains($type, 'mysql')) {
+            return 'mysql';
+        }
+
+        throw new \Exception('Only MySQL and PostgreSQL connections are supported by SQL commands now.');
     }
 
     /**
@@ -82,6 +103,7 @@ class SqlCommand extends BxCommand
         require $file;
 
         return [
+            'type' => 'mysql',
             'host' => $DBHost,
             'database' => $DBName,
             'login' => $DBLogin,

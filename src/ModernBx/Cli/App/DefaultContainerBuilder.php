@@ -11,6 +11,8 @@ use ModernBx\Cli\App\Service\DynamicCommandLoader;
 use ModernBx\Cli\App\Service\RuntimeInfo;
 use ModernBx\Cli\App\Service\Sql\MySqlDumper;
 use ModernBx\Cli\App\Service\Sql\MySqlExecutor;
+use ModernBx\Cli\App\Service\Sql\PgSqlDumper;
+use ModernBx\Cli\App\Service\Sql\PgSqlExecutor;
 use Psr\Container\ContainerInterface;
 use Symfony\Component\Console\Application;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
@@ -64,6 +66,12 @@ final class DefaultContainerBuilder
 
         $this->containerBuilder
             ->autowire(MySqlExecutor::class, MySqlExecutor::class);
+
+        $this->containerBuilder
+            ->autowire(PgSqlExecutor::class, PgSqlExecutor::class);
+
+        $this->containerBuilder
+            ->autowire(PgSqlDumper::class, PgSqlDumper::class);
 
         $runtimeInfo = $this->containerBuilder
             ->autowire(RuntimeInfo::class, RuntimeInfo::class);

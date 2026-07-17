@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace ModernBx\Cli\App\Console\Command\Sql;
 
 use ModernBx\Cli\App\Service\Sql\MySqlDumper;
+use ModernBx\Cli\App\Service\Sql\PgSqlDumper;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputDefinition;
 use Symfony\Component\Console\Input\InputInterface;
@@ -14,13 +15,16 @@ class DumpCommand extends SqlCommand
 {
     protected static $defaultName = 'sql:dump';
 
-    private MySqlDumper $dumper;
+    private MySqlDumper $mySqlDumper;
 
-    public function __construct(MySqlDumper $dumper)
+    private PgSqlDumper $pgSqlDumper;
+
+    public function __construct(MySqlDumper $mySqlDumper, PgSqlDumper $pgSqlDumper)
     {
         parent::__construct();
 
-        $this->dumper = $dumper;
+        $this->mySqlDumper = $mySqlDumper;
+        $this->pgSqlDumper = $pgSqlDumper;
     }
 
     protected function configure(): void
@@ -56,7 +60,12 @@ class DumpCommand extends SqlCommand
         }
 
         $config = $this->getConnectionConfig();
-        $this->dumper->dump($config, $file);
+
+        if ($config['type'] === 'postgres') {
+            $this->pgSqlDumper->dump($config, $file);
+        } else {
+            $this->mySqlDumper->dump($config, $file);
+        }
         $this->printer->info($this->trans('message.sql_dump.created', ['%file%' => $file]));
     }
 }
