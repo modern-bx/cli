@@ -1,6 +1,9 @@
 import { defineConfig } from 'vitepress'
 
+const base = process.env.VITEPRESS_BASE || '/'
+
 export default defineConfig({
+  base,
   title: 'modern-bx/cli',
   description: 'Документация консольного помощника для Bitrix',
   lang: 'ru-RU',
