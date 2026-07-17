@@ -6,8 +6,13 @@ declare(strict_types=1);
 
 namespace ModernBx\Cli\App\Console\Mixin\Bx;
 
+use ModernBx\Cli\App\Console\Common\Result\ModuleLifecycleResult;
+use ModernBx\Cli\App\Console\Common\Result\ResultStatus;
+use ModernBx\Cli\App\Console\Common\Result\ResultWarning;
+
 trait ModuleLifecycle
 {
+
     /**
      * @param string $moduleCode
      * @return ModuleLifecycleResult
@@ -17,13 +22,21 @@ trait ModuleLifecycle
     {
         /** @phpstan-ignore-next-line */
         if (\Bitrix\Main\ModuleManager::isModuleInstalled($moduleCode)) {
-            return new ModuleLifecycleResult($moduleCode, ModuleLifecycleResult::STATUS_ALREADY_INSTALLED);
+            return new ModuleLifecycleResult(
+                $moduleCode,
+                ResultStatus::STATUS_SUCCESS,
+                [],
+                [new ResultWarning(
+                    $this->trans("warning.module.already_installed", ["%module%" => $moduleCode]),
+                    ModuleLifecycleWarningCode::MODULE_ALREADY_INSTALLED
+                )]
+            );
         }
 
         $installer = $this->getModuleInstaller($moduleCode);
         $this->callInstallerMethod($installer, 'DoInstall');
 
-        return new ModuleLifecycleResult($moduleCode, ModuleLifecycleResult::STATUS_INSTALLED);
+        return new ModuleLifecycleResult($moduleCode, ResultStatus::STATUS_SUCCESS);
     }
 
     /**
@@ -35,13 +48,21 @@ trait ModuleLifecycle
     {
         /** @phpstan-ignore-next-line */
         if (!\Bitrix\Main\ModuleManager::isModuleInstalled($moduleCode)) {
-            return new ModuleLifecycleResult($moduleCode, ModuleLifecycleResult::STATUS_NOT_INSTALLED);
+            return new ModuleLifecycleResult(
+                $moduleCode,
+                ResultStatus::STATUS_SUCCESS,
+                [],
+                [new ResultWarning(
+                    $this->trans("warning.module.not_installed", ["%module%" => $moduleCode]),
+                    ModuleLifecycleWarningCode::MODULE_NOT_INSTALLED
+                )]
+            );
         }
 
         $installer = $this->getModuleInstaller($moduleCode);
         $this->callInstallerMethod($installer, 'DoUninstall');
 
-        return new ModuleLifecycleResult($moduleCode, ModuleLifecycleResult::STATUS_UNINSTALLED);
+        return new ModuleLifecycleResult($moduleCode, ResultStatus::STATUS_SUCCESS);
     }
 
     /**

@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace ModernBx\Cli\App\Console\Command\Bx;
 
 use ModernBx\Cli\App\Console\Mixin\Bx\ModuleLifecycle;
-use ModernBx\Cli\App\Console\Mixin\Bx\ModuleLifecycleOutput;
+use ModernBx\Cli\App\Console\Mixin\Bx\ModuleLifecycleWarningCode;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputDefinition;
 use Symfony\Component\Console\Input\InputInterface;
@@ -14,7 +14,6 @@ use Symfony\Component\Console\Output\OutputInterface;
 class ModuleReinstallCommand extends KernelCommand
 {
     use ModuleLifecycle;
-    use ModuleLifecycleOutput;
 
     /**
      * @var string
@@ -49,7 +48,26 @@ class ModuleReinstallCommand extends KernelCommand
 
         $moduleCode = $this->getModuleCode($input->getArgument("module"));
 
-        $this->printModuleLifecycleResult($this->uninstallModule($moduleCode));
-        $this->printModuleLifecycleResult($this->installModule($moduleCode));
+        $uninstallResult = $this->uninstallModule($moduleCode);
+
+        $uninstallWarnings = $uninstallResult->getWarnings(ModuleLifecycleWarningCode::MODULE_NOT_INSTALLED);
+
+        if ($uninstallWarnings) {
+            $this->printer->put($uninstallWarnings[0]->message, "comment");
+        } else {
+            $this->printer->info($this->trans("message.module.uninstalled", ["%module%" => $moduleCode]));
+        }
+
+        $installResult = $this->installModule($moduleCode);
+
+        $installWarnings = $installResult->getWarnings(ModuleLifecycleWarningCode::MODULE_ALREADY_INSTALLED);
+
+        if ($installWarnings) {
+            $this->printer->put($installWarnings[0]->message, "comment");
+
+            return;
+        }
+
+        $this->printer->info($this->trans("message.module.installed", ["%module%" => $moduleCode]));
     }
 }

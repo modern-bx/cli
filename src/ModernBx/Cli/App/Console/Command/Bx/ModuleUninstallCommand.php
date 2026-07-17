@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace ModernBx\Cli\App\Console\Command\Bx;
 
 use ModernBx\Cli\App\Console\Mixin\Bx\ModuleLifecycle;
-use ModernBx\Cli\App\Console\Mixin\Bx\ModuleLifecycleOutput;
+use ModernBx\Cli\App\Console\Mixin\Bx\ModuleLifecycleWarningCode;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputDefinition;
 use Symfony\Component\Console\Input\InputInterface;
@@ -14,7 +14,6 @@ use Symfony\Component\Console\Output\OutputInterface;
 class ModuleUninstallCommand extends KernelCommand
 {
     use ModuleLifecycle;
-    use ModuleLifecycleOutput;
 
     /**
      * @var string
@@ -49,6 +48,16 @@ class ModuleUninstallCommand extends KernelCommand
 
         $result = $this->uninstallModule($this->getModuleCode($input->getArgument("module")));
 
-        $this->printModuleLifecycleResult($result);
+        $moduleCode = $result->getModuleCode();
+
+        $warnings = $result->getWarnings(ModuleLifecycleWarningCode::MODULE_NOT_INSTALLED);
+
+        if ($warnings) {
+            $this->printer->put($warnings[0]->message, "comment");
+
+            return;
+        }
+
+        $this->printer->info($this->trans("message.module.uninstalled", ["%module%" => $moduleCode]));
     }
 }
