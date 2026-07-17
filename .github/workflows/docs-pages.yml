@@ -47,7 +47,12 @@ jobs:
 
       - name: Build VitePress documentation
         working-directory: site
+        env:
+          VITEPRESS_BASE: ${{ vars.GITHUB_PAGES_CNAME != '' && '/' || format('/{0}/', github.event.repository.name) }}
         run: npm run build
+
+      - name: Disable Jekyll for generated site
+        run: touch site/dist/.nojekyll
 
       - name: Add custom domain CNAME
         # GitHub Pages also stores the custom domain in repository settings, but
