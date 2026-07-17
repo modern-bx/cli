@@ -87,7 +87,7 @@ class RegisterCommand extends AppCommand
         $sessionCookie = $this->login($endpoint, $login, $password);
         $this->saveProjectConfig($configFile, $projectName, $endpoint, $login, $password, $sessionCookie);
 
-        $this->printer->info(sprintf('Проект зарегистрирован: %s', $configFile));
+        $this->printer->info(sprintf('Проект зарегистрирован: %s', $projectName));
     }
 
     protected function normalizeEndpoint(string $endpoint): string

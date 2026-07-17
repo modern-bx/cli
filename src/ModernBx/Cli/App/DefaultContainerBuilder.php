@@ -9,7 +9,9 @@ use ModernBx\Cli\App\Service\CommandFinder;
 use ModernBx\Cli\App\Service\ConfigurationService;
 use ModernBx\Cli\App\Service\DynamicCommandLoader;
 use ModernBx\Cli\App\Service\RuntimeInfo;
+use ModernBx\Cli\App\Service\Remote\BitrixAdminClient;
 use ModernBx\Cli\App\Service\Remote\ProjectNameGenerator;
+use ModernBx\Cli\App\Service\Remote\ProjectRegistry;
 use ModernBx\Cli\App\Service\Db\MySqlDumper;
 use ModernBx\Cli\App\Service\Db\MySqlExecutor;
 use ModernBx\Cli\App\Service\Db\PgSqlDumper;
@@ -76,6 +78,12 @@ final class DefaultContainerBuilder
 
         $this->containerBuilder
             ->autowire(ProjectNameGenerator::class, ProjectNameGenerator::class);
+
+        $this->containerBuilder
+            ->autowire(ProjectRegistry::class, ProjectRegistry::class);
+
+        $this->containerBuilder
+            ->autowire(BitrixAdminClient::class, BitrixAdminClient::class);
 
         $runtimeInfo = $this->containerBuilder
             ->autowire(RuntimeInfo::class, RuntimeInfo::class);
