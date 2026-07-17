@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace ModernBx\Cli\App\Console\Command;
 
+use ModernBx\Cli\App\Service\Remote\ProjectRegistry;
 use ModernBx\Cli\Common\Console\GenericCommand;
 use ModernBx\Cli\Common\Console\Printer;
 
@@ -116,8 +117,8 @@ class AppCommand extends GenericCommand
 
         if (!$input->hasOption('remote')) {
             $output->writeln(sprintf(
-                '<comment>Команда запущена в контексте remote "%s", но не поддерживает remote. Завершение.</comment>',
-                $sessionRemote,
+                '<comment>Команда запущена в контексте remote %s, но не поддерживает remote. Завершение.</comment>',
+                $this->getSessionRemoteLabel($sessionRemote),
             ));
 
             return true;
@@ -129,8 +130,8 @@ class AppCommand extends GenericCommand
 
         $remote = $input->getOption('remote');
         $output->writeln(sprintf(
-            '<comment>Команда выполняется в контексте remote "%s".</comment>',
-            is_string($remote) ? $remote : $sessionRemote,
+            '<comment>Команда выполняется в контексте remote %s.</comment>',
+            $this->getSessionRemoteLabel(is_string($remote) ? $remote : $sessionRemote),
         ));
 
         return false;
@@ -149,6 +150,48 @@ class AppCommand extends GenericCommand
         }
 
         return trim($remote);
+    }
+
+    protected function getSessionRemoteLabel(string $remote): string
+    {
+        try {
+            $config = (new ProjectRegistry())->load($remote);
+        } catch (\Throwable) {
+            return sprintf('"%s"', $remote);
+        }
+
+        $project = $this->readArray($this->readArray($config, 'data'), 'project');
+        $account = $this->readArray($this->readArray($project, 'accounts'), 'default');
+        $host = parse_url($this->readString($project, 'endpoint'), PHP_URL_HOST);
+        $login = $this->readString($account, 'login');
+
+        $details = array_values(array_filter([
+            is_string($host) && $host !== '' ? $host : null,
+            $login !== '' ? $login : null,
+        ]));
+
+        return $details === [] ? sprintf('"%s"', $remote) : sprintf('"%s" (%s)', $remote, implode(', ', $details));
+    }
+
+    /**
+     * @param array<string, mixed> $values
+     * @return array<string, mixed>
+     */
+    protected function readArray(array $values, string $key): array
+    {
+        $value = $values[$key] ?? [];
+
+        return is_array($value) ? $value : [];
+    }
+
+    /**
+     * @param array<string, mixed> $values
+     */
+    protected function readString(array $values, string $key): string
+    {
+        $value = $values[$key] ?? '';
+
+        return is_string($value) ? $value : '';
     }
 
     protected function setSessionRemote(string $remote): void
