@@ -15,7 +15,7 @@ use Symfony\Component\Console\Output\OutputInterface;
 
 class ExecCommand extends DbCommand
 {
-    protected static $defaultName = 'sql:exec';
+    protected static $defaultName = 'db:exec';
 
     private MySqlExecutor $mySqlExecutor;
 
@@ -44,7 +44,6 @@ class ExecCommand extends DbCommand
         $this
             ->setDescription($this->trans('command.db_exec.description'))
             ->setHelp($this->trans('command.db_exec.help'))
-            ->setAliases(['db:exec'])
             ->addOption('remote', null, InputOption::VALUE_REQUIRED, 'Кодовое имя удаленного проекта')
             ->addOption('page', null, InputOption::VALUE_REQUIRED, 'Номер страницы результата')
             ->addOption('size', null, InputOption::VALUE_REQUIRED, 'Размер страницы результата', 100);
