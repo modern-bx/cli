@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace ModernBx\Cli\App\Console\Command;
 
+use ModernBx\Cli\App\Service\Remote\ProjectRegistry;
 use ModernBx\Cli\Common\Console\GenericCommand;
 use ModernBx\Cli\Common\Console\Printer;
 
@@ -15,6 +16,10 @@ use Symfony\Contracts\Translation\TranslatorInterface;
 
 class AppCommand extends GenericCommand
 {
+    const ENV_REMOTE = 'BX_CLI_REMOTE';
+    const SESSION_REMOTE_DIR = 'modern-bx-cli';
+    const SESSION_REMOTE_FILE_PREFIX = 'remote-';
+
     const CODE_SUCCESS = 0;
     const CODE_INVALID_ARGUMENT_VALUE = 1;
     const CODE_INVALID_OPTION_VALUE = 2;
@@ -90,12 +95,173 @@ class AppCommand extends GenericCommand
         $this->verbose = $input->getOption("verbose") !== false;
 
         try {
+            if ($this->applySessionRemote($input, $output)) {
+                return static::CODE_SUCCESS;
+            }
+
             $this->executeInternal($input, $output);
             return static::CODE_SUCCESS;
         } catch (\Throwable $err) {
             $this->printer->error($err->getMessage());
             return $err->getCode();
         }
+    }
+
+    protected function applySessionRemote(InputInterface $input, OutputInterface $output): bool
+    {
+        $sessionRemote = $this->getSessionRemote();
+
+        if ($sessionRemote === null || $this->getName() === 'session:remote') {
+            return false;
+        }
+
+        if (!$input->hasOption('remote')) {
+            $output->writeln(sprintf(
+                '<comment>Команда запущена в контексте remote %s, но не поддерживает remote. Завершение.</comment>',
+                $this->getSessionRemoteLabel($sessionRemote),
+            ));
+
+            return true;
+        }
+
+        if ($input->getOption('remote') === null) {
+            $input->setOption('remote', $sessionRemote);
+        }
+
+        $remote = $input->getOption('remote');
+        $output->writeln(sprintf(
+            '<comment>Команда выполняется в контексте remote %s.</comment>',
+            $this->getSessionRemoteLabel(is_string($remote) ? $remote : $sessionRemote),
+        ));
+
+        return false;
+    }
+
+    protected function getSessionRemote(): ?string
+    {
+        $remote = getenv(static::ENV_REMOTE) ?: ($_SERVER[static::ENV_REMOTE] ?? null);
+
+        if (!is_string($remote) || trim($remote) === '') {
+            $remote = $this->readSessionRemote();
+        }
+
+        if (!is_string($remote) || trim($remote) === '') {
+            return null;
+        }
+
+        return trim($remote);
+    }
+
+    protected function getSessionRemoteLabel(string $remote): string
+    {
+        try {
+            $config = (new ProjectRegistry())->load($remote);
+        } catch (\Throwable) {
+            return sprintf('"%s"', $remote);
+        }
+
+        $project = $this->readArray($this->readArray($config, 'data'), 'project');
+        $account = $this->readArray($this->readArray($project, 'accounts'), 'default');
+        $host = parse_url($this->readString($project, 'endpoint'), PHP_URL_HOST);
+        $login = $this->readString($account, 'login');
+
+        $details = array_values(array_filter([
+            is_string($host) && $host !== '' ? $host : null,
+            $login !== '' ? $login : null,
+        ]));
+
+        return $details === [] ? sprintf('"%s"', $remote) : sprintf('"%s" (%s)', $remote, implode(', ', $details));
+    }
+
+    /**
+     * @param array<string, mixed> $values
+     * @return array<string, mixed>
+     */
+    protected function readArray(array $values, string $key): array
+    {
+        $value = $values[$key] ?? [];
+
+        return is_array($value) ? $value : [];
+    }
+
+    /**
+     * @param array<string, mixed> $values
+     */
+    protected function readString(array $values, string $key): string
+    {
+        $value = $values[$key] ?? '';
+
+        return is_string($value) ? $value : '';
+    }
+
+    protected function setSessionRemote(string $remote): void
+    {
+        $path = $this->getSessionRemoteFilePath();
+        $directory = dirname($path);
+
+        if (!is_dir($directory) && !mkdir($directory, 0700, true) && !is_dir($directory)) {
+            throw new \RuntimeException(
+                sprintf('Не удалось создать директорию: %s', $directory),
+                static::CODE_IO_ERROR,
+            );
+        }
+
+        if (file_put_contents($path, $remote . PHP_EOL, LOCK_EX) === false) {
+            throw new \RuntimeException(
+                sprintf('Не удалось сохранить remote сессии: %s', $path),
+                static::CODE_IO_ERROR,
+            );
+        }
+    }
+
+    protected function unsetSessionRemote(): void
+    {
+        $path = $this->getSessionRemoteFilePath();
+
+        if (is_file($path) && !unlink($path)) {
+            throw new \RuntimeException(sprintf('Не удалось удалить remote сессии: %s', $path), static::CODE_IO_ERROR);
+        }
+    }
+
+    protected function readSessionRemote(): ?string
+    {
+        $path = $this->getSessionRemoteFilePath();
+
+        if (!is_file($path)) {
+            return null;
+        }
+
+        $remote = file_get_contents($path);
+
+        return $remote === false ? null : trim($remote);
+    }
+
+    protected function getSessionRemoteFilePath(): string
+    {
+        return $this->getSessionRemoteDirectory()
+            . DIRECTORY_SEPARATOR
+            . static::SESSION_REMOTE_FILE_PREFIX
+            . hash('sha256', $this->getTerminalSessionId());
+    }
+
+    protected function getSessionRemoteDirectory(): string
+    {
+        return sys_get_temp_dir() . DIRECTORY_SEPARATOR . static::SESSION_REMOTE_DIR;
+    }
+
+    protected function getTerminalSessionId(): string
+    {
+        $tty = function_exists('posix_ttyname') ? @posix_ttyname(STDIN) : false;
+
+        if (is_string($tty) && $tty !== '') {
+            return 'tty:' . $tty;
+        }
+
+        if (function_exists('posix_getppid')) {
+            return 'ppid:' . (string) posix_getppid();
+        }
+
+        return 'pid:' . (string) getmypid();
     }
 
     /**
