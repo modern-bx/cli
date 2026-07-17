@@ -93,6 +93,11 @@ return [
     'error.site.update_invalid_json' => 'Значения обновления содержат некорректный JSON: %message%',
     'error.site.update_object' => 'Значения обновления должны быть JSON-объектом.',
 
+    'command.php_exec.description' => 'Выполнить PHP-код в контексте Bitrix',
+    'command.php_exec.help' => 'Читает PHP-код из stdin и выполняет его после подключения ядра Bitrix.',
+    'command.db_exec.description' => 'Выполнить SQL-код в базе данных проекта',
+    'command.db_exec.help' => 'Читает SQL-код из stdin и выполняет его в базе данных проекта.',
+
     'command.db_dump.description' => 'Сдампить базу данных проекта в SQL-файл',
     'command.db_dump.help' => 'Создает SQL-дамп MySQL 8.0/PostgreSQL средствами PHP без вызова mysqldump. ' .
         'Параметры подключения берутся из .settings.php или php_interface/dbconn.php.',

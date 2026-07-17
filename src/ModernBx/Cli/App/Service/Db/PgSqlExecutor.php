@@ -8,6 +8,25 @@ final class PgSqlExecutor
 {
     /**
      * @param array<string, mixed> $config
+     * @param string $sql
+     * @return void
+     * @throws \Exception
+     */
+    public function execute(array $config, string $sql): void
+    {
+        $connection = $this->connect($config);
+
+        try {
+            if (trim($sql) !== '' && pg_query($connection, $sql) === false) {
+                throw new \Exception('Unable to execute PostgreSQL query: ' . pg_last_error($connection));
+            }
+        } finally {
+            pg_close($connection);
+        }
+    }
+
+    /**
+     * @param array<string, mixed> $config
      * @param string $inputFile
      * @return void
      * @throws \Exception

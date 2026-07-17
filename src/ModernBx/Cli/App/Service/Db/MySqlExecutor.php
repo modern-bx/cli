@@ -8,6 +8,23 @@ final class MySqlExecutor
 {
     /**
      * @param array<string, mixed> $config
+     * @param string $sql
+     * @return void
+     * @throws \Exception
+     */
+    public function execute(array $config, string $sql): void
+    {
+        $connection = $this->connect($config);
+
+        try {
+            $this->executeMultiQuery($connection, $sql);
+        } finally {
+            $connection->close();
+        }
+    }
+
+    /**
+     * @param array<string, mixed> $config
      * @param string $inputFile
      * @return void
      * @throws \Exception

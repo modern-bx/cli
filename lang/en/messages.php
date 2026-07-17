@@ -91,6 +91,11 @@ return [
     'error.site.update_invalid_json' => 'Update values contain invalid JSON: %message%',
     'error.site.update_object' => 'Update values must be a JSON object.',
 
+    'command.php_exec.description' => 'Execute PHP code in Bitrix context',
+    'command.php_exec.help' => 'Reads PHP code from stdin and executes it after loading the Bitrix kernel.',
+    'command.db_exec.description' => 'Execute SQL code in the project database',
+    'command.db_exec.help' => 'Reads SQL code from stdin and executes it in the project database.',
+
     'command.db_dump.description' => 'Dump project database to a SQL file',
     'command.db_dump.help' => 'Creates a MySQL 8.0/PostgreSQL SQL dump using PHP only without calling mysqldump. ' .
         'Connection settings are read from .settings.php or php_interface/dbconn.php.',
