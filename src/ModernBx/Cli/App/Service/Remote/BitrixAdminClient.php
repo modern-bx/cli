@@ -176,12 +176,18 @@ final class BitrixAdminClient
         $message = preg_replace('/<br\s*\/?\s*>/i', "\n", $message) ?? $message;
         $message = strip_tags($message);
         $message = html_entity_decode($message, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $message = str_replace('\\n', "\n", $message);
         $message = preg_replace('/[ \t]+/', ' ', $message) ?? $message;
         $message = preg_replace('/\h*\R\h*/', "\n", $message) ?? $message;
-        $message = preg_replace('/^(Ошибка\s*)?(Ошибка во время выполнения запроса:\s*)/u', '', $message)
-            ?? $message;
-        $message = preg_replace('/^Ошибка\s*/u', '', $message) ?? $message;
-        $message = trim($message);
+        $lines = array_filter(
+            array_map(static fn (string $line): string => trim($line), explode("\n", $message)),
+            static fn (string $line): bool => !in_array($line, [
+                '',
+                'Ошибка',
+                'Ошибка во время выполнения запроса:',
+            ], true),
+        );
+        $message = trim(implode("\n", $lines));
 
         return $message !== '' ? $message : null;
     }
