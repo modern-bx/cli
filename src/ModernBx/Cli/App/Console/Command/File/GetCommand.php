@@ -57,7 +57,7 @@ class GetCommand extends BxCommand
         }
 
         $src = $this->normalizeSourcePath($srcArgument);
-        $dest = $this->resolveDestinationPath($destArgument);
+        $dest = $this->resolveDestinationPath($destArgument, $src);
 
         if (is_string($remote)) {
             $this->printer = $this->getPrinter($output);
@@ -78,6 +78,8 @@ class GetCommand extends BxCommand
         if (!is_file($sourcePath)) {
             throw new \RuntimeException(sprintf('Файл не найден: %s', $src), static::CODE_IO_ERROR);
         }
+
+        $this->ensureDestinationDoesNotExist($dest);
 
         if (!copy($sourcePath, $dest)) {
             throw new \RuntimeException(sprintf('Не удалось скопировать файл в: %s', $dest), static::CODE_IO_ERROR);
@@ -112,6 +114,7 @@ class GetCommand extends BxCommand
         };
 
         $this->ensureDestinationDirectory($dest);
+        $this->ensureDestinationDoesNotExist($dest);
 
         try {
             $this->bitrixAdminClient->downloadFile($endpoint, $sessionId, $src, $dest, $progressFactory);
@@ -163,7 +166,7 @@ class GetCommand extends BxCommand
         return '/' . implode('/', $segments);
     }
 
-    protected function resolveDestinationPath(string $path): string
+    protected function resolveDestinationPath(string $path, string $src): string
     {
         $path = trim($path);
 
@@ -171,11 +174,43 @@ class GetCommand extends BxCommand
             throw new \RuntimeException('Путь dest не должен быть пустым.', static::CODE_INVALID_ARGUMENT_VALUE);
         }
 
+        $isDirectoryTarget = is_dir($path) || str_ends_with($path, '/') || str_ends_with($path, '\\');
+        $absolutePath = $this->absolutizePath($path);
+
+        if ($isDirectoryTarget) {
+            $absolutePath = rtrim($absolutePath, '/') . '/' . basename($src);
+        }
+
+        return $this->normalizeLocalPath($absolutePath);
+    }
+
+    protected function absolutizePath(string $path): string
+    {
         if ($path[0] === '/') {
             return $path;
         }
 
         return getcwd() . '/' . $path;
+    }
+
+    protected function normalizeLocalPath(string $path): string
+    {
+        $segments = [];
+
+        foreach (explode('/', str_replace('\\', '/', $path)) as $segment) {
+            if ($segment === '' || $segment === '.') {
+                continue;
+            }
+
+            if ($segment === '..') {
+                array_pop($segments);
+                continue;
+            }
+
+            $segments[] = $segment;
+        }
+
+        return '/' . implode('/', $segments);
     }
 
     protected function resolveLocalSourcePath(string $src): string
@@ -192,6 +227,16 @@ class GetCommand extends BxCommand
         if (!is_dir($dir) && !mkdir($dir, 0777, true) && !is_dir($dir)) {
             throw new \RuntimeException(
                 sprintf('Не удалось создать каталог назначения: %s', $dir),
+                static::CODE_IO_ERROR,
+            );
+        }
+    }
+
+    protected function ensureDestinationDoesNotExist(string $dest): void
+    {
+        if (file_exists($dest)) {
+            throw new \RuntimeException(
+                sprintf('Файл назначения уже существует: %s', $dest),
                 static::CODE_IO_ERROR,
             );
         }
