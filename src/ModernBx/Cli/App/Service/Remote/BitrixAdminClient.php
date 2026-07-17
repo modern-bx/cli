@@ -39,10 +39,13 @@ final class BitrixAdminClient
 
     public function executePhp(string $endpoint, string $sessionId, string $code): string
     {
-        $response = $this->post($endpoint . '/bitrix/admin/php_command_line.php', [
+        $sessid = $this->getPhpConsoleSessid($endpoint, $sessionId);
+        $consoleUrl = $endpoint . '/bitrix/admin/php_command_line.php';
+        $response = $this->post($consoleUrl . '?lang=ru&sessid=' . rawurlencode($sessid), [
             'query' => $code,
-            'ajax' => 'Y',
-        ], ['Cookie: PHPSESSID=' . rawurlencode($sessionId)]);
+            'result_as_text' => 'y',
+            'ajax' => 'y',
+        ], $this->getPhpConsoleHeaders($endpoint, $sessionId));
 
         if ($response['status'] === 401
             || $response['status'] === 403
@@ -56,6 +59,88 @@ final class BitrixAdminClient
         }
 
         return $this->sanitizePhpConsoleResult($response['body']);
+    }
+
+
+    protected function getPhpConsoleSessid(string $endpoint, string $sessionId): string
+    {
+        $consoleUrl = $endpoint . '/bitrix/admin/php_command_line.php?lang=ru';
+        $response = $this->get($consoleUrl, $this->getPhpConsoleHeaders($endpoint, $sessionId));
+
+        if ($response['status'] === 401
+            || $response['status'] === 403
+            || $this->looksLikeLoginForm($response['body'])
+        ) {
+            throw new \RuntimeException('REMOTE_SESSION_EXPIRED');
+        }
+
+        if ($response['status'] < 200 || $response['status'] >= 400) {
+            throw new \RuntimeException('Не удалось открыть удаленную PHP-консоль.');
+        }
+
+        if (preg_match('/[?&]sessid=([a-f0-9]{32})/i', $response['body'], $matches)) {
+            return $matches[1];
+        }
+
+        if (preg_match('/name=["\']sessid["\'][^>]+value=["\']([^"\']+)/i', $response['body'], $matches)) {
+            return html_entity_decode($matches[1], ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        }
+
+        if (preg_match('/bitrix_sessid\(\)\s*=\s*["\']([^"\']+)/i', $response['body'], $matches)) {
+            return html_entity_decode($matches[1], ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        }
+
+        throw new \RuntimeException('Не удалось получить sessid удаленной PHP-консоли.');
+    }
+
+    /**
+     * @return string[]
+     */
+    protected function getPhpConsoleHeaders(string $endpoint, string $sessionId): array
+    {
+        return [
+            'Accept: */*',
+            'Bx-ajax: true',
+            'Origin: ' . $endpoint,
+            'Referer: ' . $endpoint . '/bitrix/admin/php_command_line.php?lang=ru',
+            'Cookie: PHPSESSID=' . $sessionId,
+        ];
+    }
+
+
+    /**
+     * @param string[] $extraHeaders
+     * @return array{status: int, headers: string[], body: string}
+     */
+    protected function get(string $url, array $extraHeaders = []): array
+    {
+        $headers = array_merge([
+            'User-Agent: bx-cli remote',
+        ], $extraHeaders);
+
+        $context = stream_context_create([
+            'http' => [
+                'method' => 'GET',
+                'header' => implode("\r\n", $headers),
+                'ignore_errors' => true,
+                'follow_location' => 0,
+                'timeout' => 30,
+            ],
+        ]);
+
+        $response = @file_get_contents($url, false, $context);
+        $responseHeaders = $http_response_header;
+        $status = $this->getStatusCode($responseHeaders);
+
+        if ($response === false || $status === null) {
+            throw new \RuntimeException('Не удалось выполнить HTTP-запрос к удаленному проекту.');
+        }
+
+        return [
+            'status' => $status,
+            'headers' => $responseHeaders,
+            'body' => $response,
+        ];
     }
 
     /**
@@ -159,6 +244,10 @@ final class BitrixAdminClient
 
     protected function sanitizePhpConsoleResult(string $body): string
     {
+        if (preg_match('/<pre[^>]*>(.*?)<\/pre>/is', $body, $matches)) {
+            $body = $matches[1];
+        }
+
         $body = preg_replace('/<script\b[^>]*>.*?<\/script>/is', '', $body) ?? $body;
         $body = preg_replace('/<style\b[^>]*>.*?<\/style>/is', '', $body) ?? $body;
         $body = strip_tags($body);
