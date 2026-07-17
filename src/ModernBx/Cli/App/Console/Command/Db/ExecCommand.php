@@ -7,6 +7,7 @@ namespace ModernBx\Cli\App\Console\Command\Db;
 use ModernBx\Cli\App\Service\Db\MySqlExecutor;
 use ModernBx\Cli\App\Service\Remote\BitrixAdminClient;
 use ModernBx\Cli\App\Service\Remote\ProjectRegistry;
+use ModernBx\Cli\App\Service\Remote\RemoteSqlPhpCodeBuilder;
 use ModernBx\Cli\App\Service\Db\PgSqlExecutor;
 use Symfony\Component\Console\Helper\Table;
 use Symfony\Component\Console\Input\InputInterface;
@@ -25,11 +26,14 @@ class ExecCommand extends DbCommand
 
     private BitrixAdminClient $bitrixAdminClient;
 
+    private RemoteSqlPhpCodeBuilder $remoteSqlPhpCodeBuilder;
+
     public function __construct(
         MySqlExecutor $mySqlExecutor,
         PgSqlExecutor $pgSqlExecutor,
         ProjectRegistry $projectRegistry,
-        BitrixAdminClient $bitrixAdminClient
+        BitrixAdminClient $bitrixAdminClient,
+        RemoteSqlPhpCodeBuilder $remoteSqlPhpCodeBuilder
     ) {
         parent::__construct();
 
@@ -37,6 +41,7 @@ class ExecCommand extends DbCommand
         $this->pgSqlExecutor = $pgSqlExecutor;
         $this->projectRegistry = $projectRegistry;
         $this->bitrixAdminClient = $bitrixAdminClient;
+        $this->remoteSqlPhpCodeBuilder = $remoteSqlPhpCodeBuilder;
     }
 
     protected function configure(): void
@@ -46,7 +51,8 @@ class ExecCommand extends DbCommand
             ->setHelp($this->trans('command.db_exec.help'))
             ->addOption('remote', null, InputOption::VALUE_REQUIRED, 'Кодовое имя удаленного проекта')
             ->addOption('page', null, InputOption::VALUE_REQUIRED, 'Номер страницы результата')
-            ->addOption('size', null, InputOption::VALUE_REQUIRED, 'Размер страницы результата', 100);
+            ->addOption('size', null, InputOption::VALUE_REQUIRED, 'Размер страницы результата', 100)
+            ->addOption('php', null, InputOption::VALUE_NONE, 'Выполнить удаленный SQL через PHP-консоль');
     }
 
     /**
@@ -96,25 +102,45 @@ class ExecCommand extends DbCommand
         $sessionId = $this->readString($this->getSessionCookieConfig($account), 'value');
         $page = $this->getPositiveIntOption($input, 'page', false);
         $size = $this->getPositiveIntOption($input, 'size', true) ?? 100;
+        $executeViaPhp = $input->getOption('php') === true;
 
         if ($sessionId === '') {
             $sessionId = $this->refreshRemoteSession($codename, $config, $project, $account);
         }
 
         try {
-            $result = $this->bitrixAdminClient->executeSql($endpoint, $sessionId, $sql, $page, $size);
+            $result = $executeViaPhp
+                ? $this->executeRemoteSqlViaPhp($endpoint, $sessionId, $sql, $page ?? 1, $size)
+                : $this->bitrixAdminClient->executeSql($endpoint, $sessionId, $sql, $page, $size);
         } catch (\RuntimeException $err) {
             if ($err->getMessage() !== 'REMOTE_SESSION_EXPIRED') {
                 throw $err;
             }
 
             $sessionId = $this->refreshRemoteSession($codename, $config, $project, $account);
-            $result = $this->bitrixAdminClient->executeSql($endpoint, $sessionId, $sql, $page, $size);
+            $result = $executeViaPhp
+                ? $this->executeRemoteSqlViaPhp($endpoint, $sessionId, $sql, $page ?? 1, $size)
+                : $this->bitrixAdminClient->executeSql($endpoint, $sessionId, $sql, $page, $size);
         }
 
         if ($result['columns'] !== []) {
             $this->renderTable($output, $result['columns'], $result['rows']);
         }
+    }
+
+    /**
+     * @return array{columns: string[], rows: array<int, array<int, string>>}
+     */
+    protected function executeRemoteSqlViaPhp(
+        string $endpoint,
+        string $sessionId,
+        string $sql,
+        int $page,
+        int $size
+    ): array {
+        $code = $this->remoteSqlPhpCodeBuilder->build($sql, $page, $size);
+
+        return $this->bitrixAdminClient->executeSqlPhp($endpoint, $sessionId, $code);
     }
 
     /**

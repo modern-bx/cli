@@ -109,6 +109,59 @@ final class BitrixAdminClient
         return $this->sanitizePhpConsoleResult($response['body']);
     }
 
+    /**
+     * @return array{columns: string[], rows: array<int, array<int, string>>}
+     */
+    public function executeSqlPhp(string $endpoint, string $sessionId, string $code): array
+    {
+        $json = $this->executePhp($endpoint, $sessionId, $code);
+        $result = json_decode($json, true);
+
+        if (!is_array($result)) {
+            throw new \RuntimeException('Удаленная PHP-консоль вернула некорректный JSON с результатом SQL-запроса.');
+        }
+
+        if (($result['ok'] ?? false) !== true) {
+            $error = $result['error'] ?? 'Не удалось выполнить удаленный SQL-запрос через PHP-консоль.';
+            $message = is_string($error)
+                ? $error
+                : 'Не удалось выполнить удаленный SQL-запрос через PHP-консоль.';
+
+            throw new \RuntimeException($message, 1);
+        }
+
+        $columns = $result['columns'] ?? [];
+        $rows = $result['rows'] ?? [];
+
+        if (!is_array($columns) || !is_array($rows)) {
+            throw new \RuntimeException('Удаленная PHP-консоль вернула некорректную структуру результата SQL-запроса.');
+        }
+
+        return [
+            'columns' => array_values(array_map([$this, 'stringifyRemoteSqlValue'], $columns)),
+            'rows' => array_values(array_map(
+                fn (mixed $row): array => is_array($row)
+                    ? array_values(array_map([$this, 'stringifyRemoteSqlValue'], $row))
+                    : [],
+                $rows,
+            )),
+        ];
+    }
+
+    protected function stringifyRemoteSqlValue(mixed $value): string
+    {
+        if ($value === null) {
+            return 'NULL';
+        }
+
+        if (is_scalar($value)) {
+            return (string) $value;
+        }
+
+        $json = json_encode($value, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
+        return is_string($json) ? $json : '';
+    }
 
 
     protected function getAdminPageSessid(string $endpoint, string $sessionId, string $path): string
