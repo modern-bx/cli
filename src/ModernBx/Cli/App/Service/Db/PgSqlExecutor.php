@@ -8,6 +8,65 @@ final class PgSqlExecutor
 {
     /**
      * @param array<string, mixed> $config
+     * @param string $sql
+     * @return array<int, array{columns: array<int, string>, rows: array<int, array<int, string|null>>}>
+     * @throws \Exception
+     */
+    public function execute(array $config, string $sql): array
+    {
+        $connection = $this->connect($config);
+
+        try {
+            if (trim($sql) === '') {
+                return [];
+            }
+
+            $result = pg_query($connection, $sql);
+
+            if ($result === false) {
+                throw new \Exception('Unable to execute PostgreSQL query: ' . pg_last_error($connection));
+            }
+
+            if (!$result instanceof \PgSql\Result) {
+                return [];
+            }
+
+            return [$this->fetchResult($result)];
+        } finally {
+            pg_close($connection);
+        }
+    }
+
+    /**
+     * @param \PgSql\Result $result
+     * @return array{columns: array<int, string>, rows: array<int, array<int, string|null>>}
+     */
+    private function fetchResult(\PgSql\Result $result): array
+    {
+        $columns = [];
+        $fieldCount = pg_num_fields($result);
+
+        for ($i = 0; $i < $fieldCount; $i++) {
+            $columns[] = pg_field_name($result, $i);
+        }
+
+        $rows = [];
+
+        while ($row = pg_fetch_row($result)) {
+            $rows[] = array_map(
+                static fn (mixed $value): ?string => $value === null ? null : (string) $value,
+                array_values($row)
+            );
+        }
+
+        return [
+            'columns' => $columns,
+            'rows' => $rows,
+        ];
+    }
+
+    /**
+     * @param array<string, mixed> $config
      * @param string $inputFile
      * @return void
      * @throws \Exception

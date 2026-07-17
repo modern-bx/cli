@@ -29,6 +29,24 @@ return [
     'command.cache_clear.help' => "Удаляет содержимое 'cache', 'managed_cache' или 'stack_cache'",
     'argument.cache.directory' => 'Каталоги кеша для очистки',
     'error.cache.invalid_directory' => 'Некорректный каталог кеша',
+    'command.module_install.description' => 'Установить модуль Bitrix',
+    'command.module_install.help' => 'Проверяет наличие модуля в bitrix/modules или local/modules ' .
+        'и запускает его DoInstall.',
+    'command.module_uninstall.description' => 'Удалить модуль Bitrix',
+    'command.module_uninstall.help' => 'Проверяет наличие модуля в bitrix/modules или local/modules ' .
+        'и запускает его DoUninstall.',
+    'command.module_reinstall.description' => 'Переустановить модуль Bitrix',
+    'command.module_reinstall.help' => 'По очереди запускает внутреннюю логику module:uninstall и module:install.',
+    'warning.module.not_installed' => 'Модуль %module% не установлен.',
+    'message.module.uninstalled' => 'Модуль %module% удалён.',
+    'argument.module.code' => 'Код модуля',
+    'warning.module.already_installed' => 'Модуль %module% уже установлен.',
+    'error.module.code_string' => 'Код модуля должен быть непустой строкой.',
+    'error.module.not_found' => 'Модуль %module% не найден в bitrix/modules или local/modules.',
+    'error.module.install_file_not_found' => 'Файл установки модуля %module% не найден.',
+    'error.module.install_class_not_found' => 'Класс установки %class% не найден.',
+    'error.module.install_method_not_found' => 'Метод %method% класса %class% не найден.',
+    'message.module.installed' => 'Модуль %module% установлен.',
     'command.module_version.description' => 'Получить версию модуля Bitrix',
     'command.module_version.help' => 'Печатает версию модуля Bitrix. Можно указать несколько кодов модулей',
     'argument.module.list' => 'Список кодов модулей',
@@ -74,6 +92,11 @@ return [
     'error.site.update_json_string' => 'Значения обновления должны быть JSON-строкой объекта.',
     'error.site.update_invalid_json' => 'Значения обновления содержат некорректный JSON: %message%',
     'error.site.update_object' => 'Значения обновления должны быть JSON-объектом.',
+
+    'command.php_exec.description' => 'Выполнить PHP-код в контексте Bitrix',
+    'command.php_exec.help' => 'Читает PHP-код из stdin и выполняет его после подключения ядра Bitrix.',
+    'command.db_exec.description' => 'Выполнить SQL-код в базе данных проекта',
+    'command.db_exec.help' => 'Читает SQL-код из stdin и выполняет его в базе данных проекта.',
 
     'command.db_dump.description' => 'Сдампить базу данных проекта в SQL-файл',
     'command.db_dump.help' => 'Создает SQL-дамп MySQL 8.0/PostgreSQL средствами PHP без вызова mysqldump. ' .

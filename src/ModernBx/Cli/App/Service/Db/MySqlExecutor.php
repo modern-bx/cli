@@ -8,6 +8,23 @@ final class MySqlExecutor
 {
     /**
      * @param array<string, mixed> $config
+     * @param string $sql
+     * @return array<int, array{columns: array<int, string>, rows: array<int, array<int, string|null>>}>
+     * @throws \Exception
+     */
+    public function execute(array $config, string $sql): array
+    {
+        $connection = $this->connect($config);
+
+        try {
+            return $this->executeMultiQuery($connection, $sql);
+        } finally {
+            $connection->close();
+        }
+    }
+
+    /**
+     * @param array<string, mixed> $config
      * @param string $inputFile
      * @return void
      * @throws \Exception
@@ -99,23 +116,26 @@ final class MySqlExecutor
     /**
      * @param \mysqli $connection
      * @param string $sql
-     * @return void
+     * @return array<int, array{columns: array<int, string>, rows: array<int, array<int, string|null>>}>
      * @throws \Exception
      */
-    private function executeMultiQuery(\mysqli $connection, string $sql): void
+    private function executeMultiQuery(\mysqli $connection, string $sql): array
     {
         if (trim($sql) === '') {
-            return;
+            return [];
         }
 
         if (!$connection->multi_query($sql)) {
             throw new \Exception('Unable to execute SQL file: ' . $connection->error);
         }
 
+        $sets = [];
+
         do {
             $result = $connection->store_result();
 
             if ($result instanceof \mysqli_result) {
+                $sets[] = $this->fetchResult($result);
                 $result->free();
             }
 
@@ -123,6 +143,33 @@ final class MySqlExecutor
                 throw new \Exception('Unable to execute SQL statement: ' . $connection->error);
             }
         } while ($connection->more_results() && $connection->next_result());
+
+        return $sets;
+    }
+
+    /**
+     * @param \mysqli_result $result
+     * @return array{columns: array<int, string>, rows: array<int, array<int, string|null>>}
+     */
+    private function fetchResult(\mysqli_result $result): array
+    {
+        $columns = array_map(
+            static fn (object $field): string => (string) $field->name,
+            $result->fetch_fields()
+        );
+        $rows = [];
+
+        while ($row = $result->fetch_assoc()) {
+            $rows[] = array_map(
+                static fn (mixed $value): ?string => $value === null ? null : (string) $value,
+                array_values($row)
+            );
+        }
+
+        return [
+            'columns' => $columns,
+            'rows' => $rows,
+        ];
     }
 
     /**
