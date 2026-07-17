@@ -4,8 +4,14 @@ export default defineConfig({
   title: 'modern-bx/cli',
   description: 'Документация консольного помощника для Bitrix',
   lang: 'ru-RU',
-  srcDir: 'docs',
   outDir: '../dist',
+  vite: {
+    server: {
+      watch: {
+        ignored: ['**/node_modules/**', '**/dist/**', '**/.vitepress/cache/**']
+      }
+    }
+  },
   cleanUrls: true,
   themeConfig: {
     nav: [
