@@ -22,9 +22,11 @@ jobs:
   publish:
     name: Build and publish VitePress site
     runs-on: ubuntu-latest
-    # The repository variable is an explicit feature flag: if USE_GITHUB_PAGES is
-    # absent or empty, the whole publishing job is skipped and no Pages deploy is attempted.
-    if: ${{ vars.USE_GITHUB_PAGES != '' }}
+    # The repository variable is an explicit feature flag. GitHub exposes an
+    # undefined repository variable as an empty string, so requiring the exact
+    # value "true" prevents accidental deploys when the variable is missing,
+    # empty, or set to a placeholder such as "false".
+    if: ${{ vars.USE_GITHUB_PAGES == 'true' }}
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -45,7 +47,12 @@ jobs:
 
       - name: Build VitePress documentation
         working-directory: site
+        env:
+          VITEPRESS_BASE: ${{ vars.GITHUB_PAGES_CNAME != '' && '/' || format('/{0}/', github.event.repository.name) }}
         run: npm run build
+
+      - name: Disable Jekyll for generated site
+        run: touch site/dist/.nojekyll
 
       - name: Add custom domain CNAME
         # GitHub Pages also stores the custom domain in repository settings, but
