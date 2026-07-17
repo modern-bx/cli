@@ -2,20 +2,20 @@
 
 declare(strict_types=1);
 
-namespace ModernBx\Cli\App\Console\Command\Project;
+namespace ModernBx\Cli\App\Console\Command\Remote;
 
 use ModernBx\Cli\App\Console\Command\AppCommand;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputDefinition;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
-use Symfony\Component\Console\Question\Question;
 use Symfony\Component\Console\Helper\QuestionHelper;
+use Symfony\Component\Console\Question\Question;
 use Symfony\Component\Yaml\Yaml;
 
 class RegisterCommand extends AppCommand
 {
-    protected static $defaultName = 'project:register';
+    protected static $defaultName = 'remote:register';
 
     protected function configure(): void
     {
@@ -67,8 +67,8 @@ class RegisterCommand extends AppCommand
             throw new \RuntimeException('Логин и пароль обязательны.', static::CODE_INVALID_ARGUMENT_VALUE);
         }
 
-        $sessionId = $this->login($endpoint, $login, $password);
-        $this->saveProjectConfig($configFile, $projectName, $endpoint, $login, $password, $sessionId);
+        $sessionCookie = $this->login($endpoint, $login, $password);
+        $this->saveProjectConfig($configFile, $projectName, $endpoint, $login, $password, $sessionCookie);
 
         $this->printer->info(sprintf('Проект зарегистрирован: %s', $configFile));
     }
@@ -128,7 +128,10 @@ class RegisterCommand extends AppCommand
         return rtrim($home, '/') . '/.config/bx-cli/projects/' . $projectName . '/project.yaml';
     }
 
-    protected function login(string $endpoint, string $login, string $password): string
+    /**
+     * @return array{value: string, expires: string}
+     */
+    protected function login(string $endpoint, string $login, string $password): array
     {
         $url = $endpoint . '/bitrix/admin/';
         $body = http_build_query([
@@ -143,7 +146,7 @@ class RegisterCommand extends AppCommand
         $headers = [
             'Content-Type: application/x-www-form-urlencoded',
             'Content-Length: ' . strlen($body),
-            'User-Agent: bx-cli project:register',
+            'User-Agent: bx-cli remote:register',
         ];
 
         $context = stream_context_create([
@@ -166,9 +169,9 @@ class RegisterCommand extends AppCommand
             throw new \RuntimeException('Не удалось авторизоваться в админке проекта.', static::CODE_IO_ERROR);
         }
 
-        $sessionId = $this->extractPhpSessionId($responseHeaders);
+        $sessionCookie = $this->extractPhpSessionIdCookie($responseHeaders);
 
-        if ($sessionId === null) {
+        if ($sessionCookie === null) {
             throw new \RuntimeException('Авторизация не вернула PHPSESSID.', static::CODE_IO_ERROR);
         }
 
@@ -176,7 +179,7 @@ class RegisterCommand extends AppCommand
             throw new \RuntimeException('Неверный логин или пароль администратора.', static::CODE_IO_ERROR);
         }
 
-        return $sessionId;
+        return $sessionCookie;
     }
 
     /**
@@ -203,25 +206,51 @@ class RegisterCommand extends AppCommand
 
     /**
      * @param string[] $headers
+     * @return array{value: string, expires: string}|null
      */
-    protected function extractPhpSessionId(array $headers): ?string
+    protected function extractPhpSessionIdCookie(array $headers): ?array
     {
         foreach ($headers as $header) {
-            if (preg_match('/^Set-Cookie:\s*PHPSESSID=([^;]+)/i', $header, $matches)) {
-                return urldecode($matches[1]);
+            if (!preg_match('/^Set-Cookie:\s*PHPSESSID=([^;]+)/i', $header, $matches)) {
+                continue;
             }
+
+            return [
+                'value' => urldecode($matches[1]),
+                'expires' => $this->extractCookieExpires($header),
+            ];
         }
 
         return null;
     }
 
+    protected function extractCookieExpires(string $setCookieHeader): string
+    {
+        if (preg_match('/;\s*expires=([^;]+)/i', $setCookieHeader, $matches)) {
+            $timestamp = strtotime($matches[1]);
+
+            if ($timestamp !== false) {
+                return date(DATE_ATOM, $timestamp);
+            }
+        }
+
+        if (preg_match('/;\s*max-age=(\d+)/i', $setCookieHeader, $matches)) {
+            return date(DATE_ATOM, time() + (int) $matches[1]);
+        }
+
+        return date(DATE_ATOM, time() + (int) ini_get('session.gc_maxlifetime'));
+    }
+
+    /**
+     * @param array{value: string, expires: string} $sessionCookie
+     */
     protected function saveProjectConfig(
         string $configFile,
         string $projectName,
         string $endpoint,
         string $login,
         string $password,
-        string $sessionId
+        array $sessionCookie
     ): void {
         $dir = dirname($configFile);
 
@@ -248,7 +277,7 @@ class RegisterCommand extends AppCommand
                             'login' => $login,
                             'password' => $password,
                             'cookies' => [
-                                'PHPSESSID' => $sessionId,
+                                'PHPSESSID' => $sessionCookie,
                             ],
                         ],
                     ],
@@ -256,7 +285,7 @@ class RegisterCommand extends AppCommand
             ],
         ];
 
-        $content = Yaml::dump($config, 6, 2);
+        $content = Yaml::dump($config, 8, 2);
 
         if (file_put_contents($configFile, $content) === false) {
             throw new \RuntimeException(
