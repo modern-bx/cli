@@ -138,6 +138,14 @@ class ExecCommand extends DbCommand
             return null;
         }
 
+        if (is_int($value)) {
+            if ($value < 1) {
+                throw new \RuntimeException(sprintf('Опция --%s должна быть положительным целым числом.', $name));
+            }
+
+            return $value;
+        }
+
         if (!is_string($value) || !ctype_digit($value) || (int) $value < 1) {
             throw new \RuntimeException(sprintf('Опция --%s должна быть положительным целым числом.', $name));
         }
