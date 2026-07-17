@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace ModernBx\Cli\App\Service\Sql;
+namespace ModernBx\Cli\App\Service\Db;
 
 final class PgSqlExecutor
 {
@@ -37,15 +37,16 @@ final class PgSqlExecutor
 
     /**
      * @param array<string, mixed> $config
+     * @param array<int, string>|null $tables
      * @return int
      * @throws \Exception
      */
-    public function wipe(array $config): int
+    public function wipe(array $config, ?array $tables = null): int
     {
         $connection = $this->connect($config);
 
         try {
-            $tables = $this->getTables($connection);
+            $tables = $this->filterTables($this->getTables($connection), $tables);
 
             if ($tables === []) {
                 return 0;
@@ -66,6 +67,26 @@ final class PgSqlExecutor
         } finally {
             pg_close($connection);
         }
+    }
+
+    /**
+     * @param array<int, array{schema: string, name: string}> $tables
+     * @param array<int, string>|null $filter
+     * @return array<int, array{schema: string, name: string}>
+     */
+    public function filterTables(array $tables, ?array $filter): array
+    {
+        if ($filter === null) {
+            return $tables;
+        }
+
+        $allowed = array_flip($filter);
+
+        return array_values(array_filter(
+            $tables,
+            static fn (array $table): bool => array_key_exists($table['name'], $allowed) ||
+                array_key_exists($table['schema'] . '.' . $table['name'], $allowed)
+        ));
     }
 
     /**

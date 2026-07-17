@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace ModernBx\Cli\App\Service\Sql;
+namespace ModernBx\Cli\App\Service\Db;
 
 final class PgSqlDumper
 {
@@ -16,15 +16,16 @@ final class PgSqlDumper
     /**
      * @param array<string, mixed> $config
      * @param string $outputFile
+     * @param array<int, string>|null $tables
      * @return void
      * @throws \Exception
      */
-    public function dump(array $config, string $outputFile): void
+    public function dump(array $config, string $outputFile, ?array $tables = null): void
     {
         $connection = $this->executor->connect($config);
 
         try {
-            $this->writeDump($connection, $outputFile);
+            $this->writeDump($connection, $outputFile, $tables);
         } finally {
             pg_close($connection);
         }
@@ -33,10 +34,11 @@ final class PgSqlDumper
     /**
      * @param \PgSql\Connection $connection
      * @param string $outputFile
+     * @param array<int, string>|null $tables
      * @return void
      * @throws \Exception
      */
-    private function writeDump(\PgSql\Connection $connection, string $outputFile): void
+    private function writeDump(\PgSql\Connection $connection, string $outputFile, ?array $tables): void
     {
         $directory = dirname($outputFile);
 
@@ -56,7 +58,7 @@ final class PgSqlDumper
             $this->write($handle, "SET client_encoding = 'UTF8';\n");
             $this->write($handle, "SET standard_conforming_strings = on;\n\n");
 
-            foreach ($this->executor->getTables($connection) as $table) {
+            foreach ($this->executor->filterTables($this->executor->getTables($connection), $tables) as $table) {
                 $this->dumpTable($connection, $handle, $table['schema'], $table['name']);
             }
         } finally {

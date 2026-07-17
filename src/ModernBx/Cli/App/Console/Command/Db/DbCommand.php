@@ -2,14 +2,44 @@
 
 declare(strict_types=1);
 
-namespace ModernBx\Cli\App\Console\Command\Sql;
+namespace ModernBx\Cli\App\Console\Command\Db;
 
 use ModernBx\Cli\App\Console\Command\BxCommand;
 use ModernBx\Cli\App\Console\Mixin\Bx\SettingFile;
+use Symfony\Component\Console\Input\InputInterface;
 
-class SqlCommand extends BxCommand
+class DbCommand extends BxCommand
 {
     use SettingFile;
+
+    /**
+     * @param InputInterface $input
+     * @return array<int, string>|null
+     * @throws \Exception
+     */
+    protected function getTableFilter(InputInterface $input): ?array
+    {
+        $tables = $input->getOption('table');
+
+        if ($tables === null) {
+            return null;
+        }
+
+        if (!is_string($tables) || trim($tables) === '') {
+            throw new \Exception($this->trans('error.db.table_string'), static::CODE_INVALID_OPTION_VALUE);
+        }
+
+        $filter = array_values(array_filter(
+            array_map(static fn (string $table): string => trim($table), explode(',', $tables)),
+            static fn (string $table): bool => $table !== ''
+        ));
+
+        if ($filter === []) {
+            throw new \Exception($this->trans('error.db.table_string'), static::CODE_INVALID_OPTION_VALUE);
+        }
+
+        return $filter;
+    }
 
     /**
      * @return array<string, mixed>

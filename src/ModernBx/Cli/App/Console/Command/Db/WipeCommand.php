@@ -2,16 +2,17 @@
 
 declare(strict_types=1);
 
-namespace ModernBx\Cli\App\Console\Command\Sql;
+namespace ModernBx\Cli\App\Console\Command\Db;
 
-use ModernBx\Cli\App\Service\Sql\MySqlExecutor;
-use ModernBx\Cli\App\Service\Sql\PgSqlExecutor;
+use ModernBx\Cli\App\Service\Db\MySqlExecutor;
+use ModernBx\Cli\App\Service\Db\PgSqlExecutor;
 use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 
-class WipeCommand extends SqlCommand
+class WipeCommand extends DbCommand
 {
-    protected static $defaultName = 'sql:wipe';
+    protected static $defaultName = 'db:wipe';
 
     private MySqlExecutor $mySqlExecutor;
 
@@ -28,8 +29,14 @@ class WipeCommand extends SqlCommand
     protected function configure(): void
     {
         $this
-            ->setDescription($this->trans('command.sql_wipe.description'))
-            ->setHelp($this->trans('command.sql_wipe.help'));
+            ->setDescription($this->trans('command.db_wipe.description'))
+            ->setHelp($this->trans('command.db_wipe.help'))
+            ->addOption(
+                'table',
+                null,
+                InputOption::VALUE_REQUIRED,
+                $this->trans('option.db.table'),
+            );
     }
 
     /**
@@ -43,9 +50,10 @@ class WipeCommand extends SqlCommand
         parent::executeInternal($input, $output);
 
         $config = $this->getConnectionConfig();
+        $tables = $this->getTableFilter($input);
         $count = $config['type'] === 'postgres'
-            ? $this->pgSqlExecutor->wipe($config)
-            : $this->mySqlExecutor->wipe($config);
-        $this->printer->info($this->trans('message.sql_wipe.done', ['%count%' => (string) $count]));
+            ? $this->pgSqlExecutor->wipe($config, $tables)
+            : $this->mySqlExecutor->wipe($config, $tables);
+        $this->printer->info($this->trans('message.db_wipe.done', ['%count%' => (string) $count]));
     }
 }

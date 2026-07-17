@@ -2,22 +2,23 @@
 
 declare(strict_types=1);
 
-namespace ModernBx\Cli\App\Service\Sql;
+namespace ModernBx\Cli\App\Service\Db;
 
 final class MySqlDumper
 {
     /**
      * @param array<string, mixed> $config
      * @param string $outputFile
+     * @param array<int, string>|null $tables
      * @return void
      * @throws \Exception
      */
-    public function dump(array $config, string $outputFile): void
+    public function dump(array $config, string $outputFile, ?array $tables = null): void
     {
         $connection = $this->connect($config);
 
         try {
-            $this->writeDump($connection, $config, $outputFile);
+            $this->writeDump($connection, $config, $outputFile, $tables);
         } finally {
             $connection->close();
         }
@@ -62,10 +63,11 @@ final class MySqlDumper
      * @param \mysqli $connection
      * @param array<string, mixed> $config
      * @param string $outputFile
+     * @param array<int, string>|null $tables
      * @return void
      * @throws \Exception
      */
-    private function writeDump(\mysqli $connection, array $config, string $outputFile): void
+    private function writeDump(\mysqli $connection, array $config, string $outputFile, ?array $tables): void
     {
         $directory = dirname($outputFile);
 
@@ -87,7 +89,7 @@ final class MySqlDumper
             $this->write($handle, "SET FOREIGN_KEY_CHECKS=0;\n");
             $this->write($handle, "SET SQL_MODE='NO_AUTO_VALUE_ON_ZERO';\n\n");
 
-            foreach ($this->getTables($connection) as $table) {
+            foreach ($this->getTables($connection, $tables) as $table) {
                 $this->dumpTable($connection, $handle, $table);
             }
 
@@ -99,10 +101,11 @@ final class MySqlDumper
 
     /**
      * @param \mysqli $connection
+     * @param array<int, string>|null $filter
      * @return array<int, string>
      * @throws \Exception
      */
-    private function getTables(\mysqli $connection): array
+    private function getTables(\mysqli $connection, ?array $filter = null): array
     {
         $result = $connection->query('SHOW FULL TABLES WHERE Table_type = \'BASE TABLE\'');
 
@@ -117,6 +120,14 @@ final class MySqlDumper
         }
 
         $result->free();
+
+        if ($filter !== null) {
+            $allowed = array_flip($filter);
+            $tables = array_values(array_filter(
+                $tables,
+                static fn (string $table): bool => array_key_exists($table, $allowed)
+            ));
+        }
 
         return $tables;
     }

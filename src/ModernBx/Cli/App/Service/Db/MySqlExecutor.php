@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace ModernBx\Cli\App\Service\Sql;
+namespace ModernBx\Cli\App\Service\Db;
 
 final class MySqlExecutor
 {
@@ -35,15 +35,16 @@ final class MySqlExecutor
 
     /**
      * @param array<string, mixed> $config
+     * @param array<int, string>|null $tables
      * @return int
      * @throws \Exception
      */
-    public function wipe(array $config): int
+    public function wipe(array $config, ?array $tables = null): int
     {
         $connection = $this->connect($config);
 
         try {
-            $tables = $this->getTables($connection);
+            $tables = $this->getTables($connection, $tables);
             $this->executeQuery($connection, 'SET FOREIGN_KEY_CHECKS=0');
 
             try {
@@ -126,10 +127,11 @@ final class MySqlExecutor
 
     /**
      * @param \mysqli $connection
+     * @param array<int, string>|null $filter
      * @return array<int, string>
      * @throws \Exception
      */
-    private function getTables(\mysqli $connection): array
+    private function getTables(\mysqli $connection, ?array $filter = null): array
     {
         $result = $connection->query('SHOW FULL TABLES WHERE Table_type = \'BASE TABLE\'');
 
@@ -144,6 +146,14 @@ final class MySqlExecutor
         }
 
         $result->free();
+
+        if ($filter !== null) {
+            $allowed = array_flip($filter);
+            $tables = array_values(array_filter(
+                $tables,
+                static fn (string $table): bool => array_key_exists($table, $allowed)
+            ));
+        }
 
         return $tables;
     }

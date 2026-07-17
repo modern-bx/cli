@@ -75,21 +75,23 @@ return [
     'error.site.update_invalid_json' => 'Значения обновления содержат некорректный JSON: %message%',
     'error.site.update_object' => 'Значения обновления должны быть JSON-объектом.',
 
-    'command.sql_dump.description' => 'Сдампить базу данных проекта в SQL-файл',
-    'command.sql_dump.help' => 'Создает SQL-дамп MySQL 8.0/PostgreSQL средствами PHP без вызова mysqldump. ' .
+    'command.db_dump.description' => 'Сдампить базу данных проекта в SQL-файл',
+    'command.db_dump.help' => 'Создает SQL-дамп MySQL 8.0/PostgreSQL средствами PHP без вызова mysqldump. ' .
         'Параметры подключения берутся из .settings.php или php_interface/dbconn.php.',
-    'argument.sql_dump.file' => 'Путь к SQL-файлу дампа',
-    'error.sql_dump.file_string' => 'Путь к SQL-файлу должен быть непустой строкой.',
-    'message.sql_dump.created' => 'SQL-дамп создан: %file%',
-    'command.sql_apply.description' => 'Выполнить SQL-файл в базе данных проекта',
-    'command.sql_apply.help' => 'Выполняет SQL-файл в контексте MySQL/PostgreSQL-базы приложения средствами PHP ' .
+    'argument.db_dump.file' => 'Путь к SQL-файлу дампа',
+    'error.db_dump.file_string' => 'Путь к SQL-файлу должен быть непустой строкой.',
+    'message.db_dump.created' => 'SQL-дамп создан: %file%',
+    'command.db_apply.description' => 'Выполнить SQL-файл в базе данных проекта',
+    'command.db_apply.help' => 'Выполняет SQL-файл в контексте MySQL/PostgreSQL-базы приложения средствами PHP ' .
         'без внешних утилит.',
-    'argument.sql_apply.file' => 'Путь к SQL-файлу для выполнения',
-    'error.sql_apply.file_string' => 'Путь к SQL-файлу должен быть непустой строкой.',
-    'message.sql_apply.applied' => 'SQL-файл выполнен: %file%',
-    'command.sql_wipe.description' => 'Стереть все данные из базы данных проекта',
-    'command.sql_wipe.help' => 'Очищает все таблицы MySQL/PostgreSQL-базы приложения через TRUNCATE средствами PHP ' .
+    'argument.db_apply.file' => 'Путь к SQL-файлу для выполнения',
+    'error.db_apply.file_string' => 'Путь к SQL-файлу должен быть непустой строкой.',
+    'message.db_apply.applied' => 'SQL-файл выполнен: %file%',
+    'command.db_wipe.description' => 'Стереть все данные из базы данных проекта',
+    'command.db_wipe.help' => 'Очищает все таблицы MySQL/PostgreSQL-базы приложения через TRUNCATE средствами PHP ' .
         'без внешних утилит.',
-    'message.sql_wipe.done' => 'Данные удалены из таблиц: %count%',
+    'message.db_wipe.done' => 'Данные удалены из таблиц: %count%',
+    'option.db.table' => 'Список таблиц через запятую. Для PostgreSQL можно указывать schema.table.',
+    'error.db.table_string' => 'Список таблиц должен быть непустой строкой.',
     'error.bitrix.not_found' => 'Установка Bitrix не найдена.',
 ];

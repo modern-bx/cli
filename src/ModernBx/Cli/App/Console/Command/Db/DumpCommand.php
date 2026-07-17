@@ -2,18 +2,19 @@
 
 declare(strict_types=1);
 
-namespace ModernBx\Cli\App\Console\Command\Sql;
+namespace ModernBx\Cli\App\Console\Command\Db;
 
-use ModernBx\Cli\App\Service\Sql\MySqlDumper;
-use ModernBx\Cli\App\Service\Sql\PgSqlDumper;
+use ModernBx\Cli\App\Service\Db\MySqlDumper;
+use ModernBx\Cli\App\Service\Db\PgSqlDumper;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputDefinition;
 use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 
-class DumpCommand extends SqlCommand
+class DumpCommand extends DbCommand
 {
-    protected static $defaultName = 'sql:dump';
+    protected static $defaultName = 'db:dump';
 
     private MySqlDumper $mySqlDumper;
 
@@ -30,14 +31,20 @@ class DumpCommand extends SqlCommand
     protected function configure(): void
     {
         $this
-            ->setDescription($this->trans('command.sql_dump.description'))
-            ->setHelp($this->trans('command.sql_dump.help'))
+            ->setDescription($this->trans('command.db_dump.description'))
+            ->setHelp($this->trans('command.db_dump.help'))
             ->setDefinition(
                 new InputDefinition([
                     new InputArgument(
                         'file',
                         InputArgument::REQUIRED,
-                        $this->trans('argument.sql_dump.file'),
+                        $this->trans('argument.db_dump.file'),
+                    ),
+                    new InputOption(
+                        'table',
+                        null,
+                        InputOption::VALUE_REQUIRED,
+                        $this->trans('option.db.table'),
                     ),
                 ]),
             );
@@ -56,16 +63,17 @@ class DumpCommand extends SqlCommand
         $file = $input->getArgument('file');
 
         if (!is_string($file) || $file === '') {
-            throw new \Exception($this->trans('error.sql_dump.file_string'), static::CODE_INVALID_ARGUMENT_VALUE);
+            throw new \Exception($this->trans('error.db_dump.file_string'), static::CODE_INVALID_ARGUMENT_VALUE);
         }
 
         $config = $this->getConnectionConfig();
+        $tables = $this->getTableFilter($input);
 
         if ($config['type'] === 'postgres') {
-            $this->pgSqlDumper->dump($config, $file);
+            $this->pgSqlDumper->dump($config, $file, $tables);
         } else {
-            $this->mySqlDumper->dump($config, $file);
+            $this->mySqlDumper->dump($config, $file, $tables);
         }
-        $this->printer->info($this->trans('message.sql_dump.created', ['%file%' => $file]));
+        $this->printer->info($this->trans('message.db_dump.created', ['%file%' => $file]));
     }
 }

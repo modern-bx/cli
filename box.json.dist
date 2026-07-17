@@ -26,6 +26,18 @@
                 "tests",
                 "test"
             ]
+        },
+        {
+            "name": "*.xsd",
+            "in": "vendor"
+        },
+        {
+            "name": "*.xml",
+            "in": "vendor"
+        },
+        {
+            "name": "*.json",
+            "in": "vendor"
         }
     ],
     "git": "build-version",
