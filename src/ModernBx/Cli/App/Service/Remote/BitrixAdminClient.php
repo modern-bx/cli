@@ -54,7 +54,9 @@ final class BitrixAdminClient
             throw new \RuntimeException('REMOTE_SESSION_EXPIRED');
         }
 
-        if ($response['status'] < 200 || $response['status'] >= 400) {
+        if (($response['status'] < 200 || $response['status'] >= 400)
+            && !$this->hasPhpConsoleResult($response['body'])
+        ) {
             throw new \RuntimeException('Не удалось выполнить удаленный PHP-код.');
         }
 
@@ -240,6 +242,11 @@ final class BitrixAdminClient
         }
 
         return date(DATE_ATOM, time() + (int) ini_get('session.gc_maxlifetime'));
+    }
+
+    protected function hasPhpConsoleResult(string $body): bool
+    {
+        return (bool) preg_match('/<pre[^>]*>.*?<\/pre>/is', $body);
     }
 
     protected function sanitizePhpConsoleResult(string $body): string
