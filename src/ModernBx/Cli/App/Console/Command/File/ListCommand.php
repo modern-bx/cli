@@ -98,6 +98,11 @@ class ListCommand extends BxCommand
             );
         }
 
+        $items = array_values(array_filter(
+            $items,
+            static fn (string $item): bool => $item !== '.' && $item !== '..',
+        ));
+
         return array_map(
             static fn (string $item): string => rtrim($directory, '/') . '/' . $item,
             $items,
@@ -228,7 +233,10 @@ try {
     $paths = is_dir($fullExpr)
         ? array_map(
             static fn (string $item): string => rtrim($fullExpr, '/') . '/' . $item,
-            scandir($fullExpr) ?: [],
+            array_values(array_filter(
+                scandir($fullExpr) ?: [],
+                static fn (string $item): bool => $item !== '.' && $item !== '..',
+            )),
         )
         : (glob($fullExpr, GLOB_BRACE) ?: []);
 
