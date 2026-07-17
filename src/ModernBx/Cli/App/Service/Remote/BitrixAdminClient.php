@@ -225,6 +225,52 @@ final class BitrixAdminClient
         throw new \RuntimeException('Не удалось загрузить файл на удаленный проект.');
     }
 
+    public function deleteFile(string $endpoint, string $sessionId, string $path): void
+    {
+        $directory = dirname($path);
+        $filename = basename($path);
+        $adminPath = '/bitrix/admin/fileman_admin.php?'
+            . http_build_query([
+                'lang' => 'ru',
+                'site' => 's1',
+                'path' => $directory,
+            ]);
+        $sessid = $this->getFilemanAdminSessid($endpoint, $sessionId, $directory, $adminPath);
+        $deletePath = '/bitrix/admin/fileman_admin.php?'
+            . http_build_query([
+                'ID' => $filename,
+                'action_button' => 'delete',
+                'lang' => 'ru',
+                'sessid' => $sessid,
+                'site' => 's1',
+                'path' => $directory,
+                'show_perms_for' => '0',
+                'mode' => 'list',
+                'table_id' => 'tbl_fileman_admin',
+            ]);
+        $response = $this->get(
+            $endpoint . $deletePath,
+            $this->getFilemanAjaxHeaders($endpoint, $sessionId, $directory),
+        );
+
+        if ($response['status'] === 401
+            || $response['status'] === 403
+            || $this->looksLikeLoginForm($response['body'])
+        ) {
+            throw new \RuntimeException('REMOTE_SESSION_EXPIRED');
+        }
+
+        $filemanError = $this->extractFilemanError($response['body']);
+
+        if ($filemanError !== null) {
+            throw new \RuntimeException($filemanError, 1);
+        }
+
+        if ($response['status'] < 200 || $response['status'] >= 300) {
+            throw new \RuntimeException('Не удалось удалить файл на удаленном проекте.');
+        }
+    }
+
     protected function stringifyRemoteSqlValue(mixed $value): string
     {
         if ($value === null) {
@@ -450,6 +496,48 @@ final class BitrixAdminClient
         }
 
         return $this->extractSessid($response['body']);
+    }
+
+    protected function getFilemanAdminSessid(
+        string $endpoint,
+        string $sessionId,
+        string $path,
+        string $adminPath
+    ): string {
+        $response = $this->get($endpoint . $adminPath, $this->getFilemanAjaxHeaders($endpoint, $sessionId, $path));
+
+        if ($response['status'] === 401
+            || $response['status'] === 403
+            || $this->looksLikeLoginForm($response['body'])
+        ) {
+            throw new \RuntimeException('REMOTE_SESSION_EXPIRED');
+        }
+
+        if ($response['status'] < 200 || $response['status'] >= 400) {
+            throw new \RuntimeException('Не удалось открыть файловый менеджер удаленного проекта.');
+        }
+
+        return $this->extractSessid($response['body']);
+    }
+
+    /**
+     * @return string[]
+     */
+    protected function getFilemanAjaxHeaders(string $endpoint, string $sessionId, string $path): array
+    {
+        $referer = $endpoint . '/bitrix/admin/fileman_admin.php?'
+            . http_build_query([
+                'lang' => 'ru',
+                'site' => 's1',
+                'path' => $path,
+            ]);
+
+        return [
+            'Accept: */*',
+            'Bx-ajax: true',
+            'Referer: ' . $referer,
+            'Cookie: PHPSESSID=' . $sessionId,
+        ];
     }
 
     /**

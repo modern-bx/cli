@@ -36,6 +36,7 @@ class PutCommand extends AppCommand
             ->setDescription('Загружает локальный файл в файловую структуру удаленного проекта')
             ->setHelp('Команда загружает локальный файл в путь относительно document root удаленного проекта.')
             ->addOption('remote', null, InputOption::VALUE_REQUIRED, 'Кодовое имя удаленного проекта')
+            ->addOption('force', null, InputOption::VALUE_NONE, 'Удалить удаленный файл перед загрузкой')
             ->addArgument('src', InputArgument::REQUIRED, 'Путь к локальному файлу')
             ->addArgument('dest', InputArgument::REQUIRED, 'Удаленный путь относительно document root проекта');
     }
@@ -61,17 +62,35 @@ class PutCommand extends AppCommand
 
         $src = $this->resolveSourcePath($srcArgument);
         [$remoteDirectory, $filename] = $this->resolveRemoteDestination($destArgument, basename($src));
-        $this->executeRemote($remote, $src, $remoteDirectory, $filename);
+        $this->executeRemote($remote, $src, $remoteDirectory, $filename, $input->getOption('force') === true);
     }
 
-    protected function executeRemote(string $codename, string $src, string $remoteDirectory, string $filename): void
-    {
+    protected function executeRemote(
+        string $codename,
+        string $src,
+        string $remoteDirectory,
+        string $filename,
+        bool $force
+    ): void {
         $config = $this->remoteProjectConfigManager->load($codename);
         $endpoint = $this->remoteProjectConfigManager->getEndpoint($config);
         $sessionId = $this->remoteProjectConfigManager->getSessionId($config);
 
         if ($sessionId === '') {
             $sessionId = $this->remoteProjectConfigManager->refreshSession($codename, $config);
+        }
+
+        if ($force) {
+            try {
+                $this->deleteRemoteFile($endpoint, $sessionId, rtrim($remoteDirectory, '/') . '/' . $filename);
+            } catch (\RuntimeException $err) {
+                if ($err->getMessage() !== 'REMOTE_SESSION_EXPIRED') {
+                    throw $err;
+                }
+
+                $sessionId = $this->remoteProjectConfigManager->refreshSession($codename, $config);
+                $this->deleteRemoteFile($endpoint, $sessionId, rtrim($remoteDirectory, '/') . '/' . $filename);
+            }
         }
 
         try {
@@ -86,6 +105,17 @@ class PutCommand extends AppCommand
         }
 
         $this->printer->info(sprintf('Файл загружен: %s/%s', rtrim($remoteDirectory, '/'), $filename));
+    }
+
+    protected function deleteRemoteFile(string $endpoint, string $sessionId, string $path): void
+    {
+        try {
+            $this->bitrixAdminClient->deleteFile($endpoint, $sessionId, $path);
+        } catch (\RuntimeException $err) {
+            if ($err->getMessage() === 'REMOTE_SESSION_EXPIRED') {
+                throw $err;
+            }
+        }
     }
 
     protected function resolveSourcePath(string $path): string

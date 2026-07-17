@@ -15,6 +15,8 @@ use Symfony\Contracts\Translation\TranslatorInterface;
 
 class AppCommand extends GenericCommand
 {
+    const ENV_REMOTE = 'BX_CLI_REMOTE';
+
     const CODE_SUCCESS = 0;
     const CODE_INVALID_ARGUMENT_VALUE = 1;
     const CODE_INVALID_OPTION_VALUE = 2;
@@ -90,12 +92,57 @@ class AppCommand extends GenericCommand
         $this->verbose = $input->getOption("verbose") !== false;
 
         try {
+            if ($this->applySessionRemote($input, $output)) {
+                return static::CODE_SUCCESS;
+            }
+
             $this->executeInternal($input, $output);
             return static::CODE_SUCCESS;
         } catch (\Throwable $err) {
             $this->printer->error($err->getMessage());
             return $err->getCode();
         }
+    }
+
+    protected function applySessionRemote(InputInterface $input, OutputInterface $output): bool
+    {
+        $sessionRemote = $this->getSessionRemote();
+
+        if ($sessionRemote === null || $this->getName() === 'session:remote') {
+            return false;
+        }
+
+        if (!$input->hasOption('remote')) {
+            $output->writeln(sprintf(
+                '<comment>Команда запущена в контексте remote "%s", но не поддерживает remote. Завершение.</comment>',
+                $sessionRemote,
+            ));
+
+            return true;
+        }
+
+        if ($input->getOption('remote') === null) {
+            $input->setOption('remote', $sessionRemote);
+        }
+
+        $remote = $input->getOption('remote');
+        $output->writeln(sprintf(
+            '<comment>Команда выполняется в контексте remote "%s".</comment>',
+            is_string($remote) ? $remote : $sessionRemote,
+        ));
+
+        return false;
+    }
+
+    protected function getSessionRemote(): ?string
+    {
+        $remote = getenv(static::ENV_REMOTE) ?: ($_SERVER[static::ENV_REMOTE] ?? null);
+
+        if (!is_string($remote) || trim($remote) === '') {
+            return null;
+        }
+
+        return trim($remote);
     }
 
     /**
