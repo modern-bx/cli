@@ -9,6 +9,7 @@ use ModernBx\Cli\App\Service\CommandFinder;
 use ModernBx\Cli\App\Service\ConfigurationService;
 use ModernBx\Cli\App\Service\DynamicCommandLoader;
 use ModernBx\Cli\App\Service\RuntimeInfo;
+use ModernBx\Cli\App\Service\Remote\ProjectNameGenerator;
 use ModernBx\Cli\App\Service\Db\MySqlDumper;
 use ModernBx\Cli\App\Service\Db\MySqlExecutor;
 use ModernBx\Cli\App\Service\Db\PgSqlDumper;
@@ -72,6 +73,9 @@ final class DefaultContainerBuilder
 
         $this->containerBuilder
             ->autowire(PgSqlDumper::class, PgSqlDumper::class);
+
+        $this->containerBuilder
+            ->autowire(ProjectNameGenerator::class, ProjectNameGenerator::class);
 
         $runtimeInfo = $this->containerBuilder
             ->autowire(RuntimeInfo::class, RuntimeInfo::class);

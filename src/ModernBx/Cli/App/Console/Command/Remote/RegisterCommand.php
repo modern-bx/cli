@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace ModernBx\Cli\App\Console\Command\Remote;
 
 use ModernBx\Cli\App\Console\Command\AppCommand;
+use ModernBx\Cli\App\Service\Remote\ProjectNameGenerator;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputDefinition;
 use Symfony\Component\Console\Input\InputInterface;
@@ -12,10 +13,20 @@ use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Helper\QuestionHelper;
 use Symfony\Component\Console\Question\Question;
 use Symfony\Component\Yaml\Yaml;
+use Symfony\Contracts\Translation\TranslatorInterface;
 
 class RegisterCommand extends AppCommand
 {
     protected static $defaultName = 'remote:register';
+
+    protected ProjectNameGenerator $projectNameGenerator;
+
+    public function __construct(ProjectNameGenerator $projectNameGenerator, ?TranslatorInterface $translator = null)
+    {
+        $this->projectNameGenerator = $projectNameGenerator;
+
+        parent::__construct($translator);
+    }
 
     protected function configure(): void
     {
@@ -137,81 +148,18 @@ class RegisterCommand extends AppCommand
 
     protected function generateProjectName(string $projectsDir): string
     {
-        $adjectives = $this->getProjectNameAdjectives();
-        $nouns = $this->getProjectNameNouns();
-        $variants = [];
+        $projectName = $this->projectNameGenerator->generate(
+            fn (string $name): bool => $this->projectConfigExists($projectsDir, $name),
+        );
 
-        foreach ($adjectives as $adjective) {
-            foreach ($nouns as $noun) {
-                $variants[] = $adjective . '-' . $noun;
-            }
-        }
-
-        while ($variants !== []) {
-            $index = random_int(0, count($variants) - 1);
-            $projectName = $variants[$index];
-
-            if (!$this->projectConfigExists($projectsDir, $projectName)) {
-                return $projectName;
-            }
-
-            array_splice($variants, $index, 1);
+        if ($projectName !== null) {
+            return $projectName;
         }
 
         throw new \RuntimeException(
             'Не удалось подобрать свободное кодовое имя проекта: все варианты заняты.',
             static::CODE_IO_ERROR,
         );
-    }
-
-    /**
-     * @return string[]
-     */
-    protected function getProjectNameAdjectives(): array
-    {
-        return [
-            'brave',
-            'bright',
-            'calm',
-            'clever',
-            'cosmic',
-            'eager',
-            'gentle',
-            'golden',
-            'happy',
-            'lucky',
-            'merry',
-            'nimble',
-            'proud',
-            'rapid',
-            'silent',
-            'silver',
-        ];
-    }
-
-    /**
-     * @return string[]
-     */
-    protected function getProjectNameNouns(): array
-    {
-        return [
-            'badger',
-            'beaver',
-            'cougar',
-            'dolphin',
-            'eagle',
-            'falcon',
-            'fox',
-            'lynx',
-            'otter',
-            'panda',
-            'raven',
-            'tiger',
-            'turtle',
-            'whale',
-            'wolf',
-            'zebra',
-        ];
     }
 
     protected function getProjectsDir(): string
