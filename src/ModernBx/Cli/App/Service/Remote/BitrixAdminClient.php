@@ -37,6 +37,46 @@ final class BitrixAdminClient
         return $cookie;
     }
 
+
+    /**
+     * @return array{columns: string[], rows: array<int, array<int, string>>}
+     */
+    public function executeSql(string $endpoint, string $sessionId, string $sql, ?int $page, int $size): array
+    {
+        $sessid = $this->getAdminPageSessid(
+            $endpoint,
+            $sessionId,
+            '/bitrix/admin/sql.php?lang=ru&del_query=Y',
+        );
+        $url = $endpoint . '/bitrix/admin/sql.php?mode=frame&lang=ru&del_query=Y';
+
+        if ($page !== null) {
+            $url .= '&PAGEN_1=' . $page;
+        }
+
+        $url .= '&SIZEN_1=' . $size;
+        $response = $this->post($url, [
+            'sessid' => $sessid,
+            'query' => $sql,
+            'save' => 'Y',
+        ], $this->getSqlHeaders($endpoint, $sessionId));
+
+        if ($response['status'] === 401
+            || $response['status'] === 403
+            || $this->looksLikeLoginForm($response['body'])
+        ) {
+            throw new \RuntimeException('REMOTE_SESSION_EXPIRED');
+        }
+
+        if (($response['status'] < 200 || $response['status'] >= 400)
+            && !$this->hasSqlResult($response['body'])
+        ) {
+            throw new \RuntimeException('Не удалось выполнить удаленный SQL-запрос.');
+        }
+
+        return $this->parseSqlResult($response['body']);
+    }
+
     public function executePhp(string $endpoint, string $sessionId, string $code): string
     {
         $sessid = $this->getPhpConsoleSessid($endpoint, $sessionId);
@@ -64,6 +104,101 @@ final class BitrixAdminClient
     }
 
 
+
+    protected function getAdminPageSessid(string $endpoint, string $sessionId, string $path): string
+    {
+        $response = $this->get($endpoint . $path, $this->getSqlHeaders($endpoint, $sessionId));
+
+        if ($response['status'] === 401
+            || $response['status'] === 403
+            || $this->looksLikeLoginForm($response['body'])
+        ) {
+            throw new \RuntimeException('REMOTE_SESSION_EXPIRED');
+        }
+
+        if ($response['status'] < 200 || $response['status'] >= 400) {
+            throw new \RuntimeException('Не удалось открыть страницу администрирования удаленного проекта.');
+        }
+
+        return $this->extractSessid($response['body']);
+    }
+
+    protected function extractSessid(string $body): string
+    {
+        if (preg_match('/[?&]sessid=([a-f0-9]{32})/i', $body, $matches)) {
+            return $matches[1];
+        }
+
+        if (preg_match('/name=["\']sessid["\'][^>]+value=["\']([^"\']+)/i', $body, $matches)) {
+            return html_entity_decode($matches[1], ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        }
+
+        if (preg_match('/bitrix_sessid\(\)\s*=\s*["\']([^"\']+)/i', $body, $matches)) {
+            return html_entity_decode($matches[1], ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        }
+
+        throw new \RuntimeException('Не удалось получить sessid удаленной админки.');
+    }
+
+    /**
+     * @return string[]
+     */
+    protected function getSqlHeaders(string $endpoint, string $sessionId): array
+    {
+        return [
+            'Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'Origin: ' . $endpoint,
+            'Referer: ' . $endpoint . '/bitrix/admin/sql.php?lang=ru&del_query=Y',
+            'Cookie: PHPSESSID=' . $sessionId,
+        ];
+    }
+
+    protected function hasSqlResult(string $body): bool
+    {
+        return str_contains($body, 'id="tbl_sql"') || str_contains($body, "id='tbl_sql'");
+    }
+
+    /**
+     * @return array{columns: string[], rows: array<int, array<int, string>>}
+     */
+    protected function parseSqlResult(string $body): array
+    {
+        if (!preg_match('/<table[^>]+id=["\']tbl_sql["\'][^>]*>(.*?)<\/table>/is', $body, $tableMatches)) {
+            return ['columns' => [], 'rows' => []];
+        }
+
+        $table = $tableMatches[1];
+        preg_match_all(
+            '/<div[^>]+class=["\'][^"\']*adm-list-table-cell-inner[^"\']*["\'][^>]*>(.*?)<\/div>/is',
+            $table,
+            $headerMatches,
+        );
+        $columns = array_map(fn (string $value): string => $this->cleanSqlCell($value), $headerMatches[1]);
+        preg_match_all(
+            '/<tr[^>]+class=["\'][^"\']*adm-list-table-row[^"\']*["\'][^>]*>(.*?)<\/tr>/is',
+            $table,
+            $rowMatches,
+        );
+        $rows = [];
+
+        foreach ($rowMatches[1] as $rowHtml) {
+            preg_match_all('/<td[^>]*>(.*?)<\/td>/is', $rowHtml, $cellMatches);
+            $rows[] = array_map(fn (string $value): string => $this->cleanSqlCell($value), $cellMatches[1]);
+        }
+
+        return ['columns' => $columns, 'rows' => $rows];
+    }
+
+    protected function cleanSqlCell(string $value): string
+    {
+        $value = preg_replace('/<script\b[^>]*>.*?<\/script>/is', '', $value) ?? $value;
+        $value = strip_tags($value);
+        $value = html_entity_decode($value, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $value = str_replace("\xc2\xa0", '', $value);
+
+        return trim($value);
+    }
+
     protected function getPhpConsoleSessid(string $endpoint, string $sessionId): string
     {
         $consoleUrl = $endpoint . '/bitrix/admin/php_command_line.php?lang=ru';
@@ -80,19 +215,7 @@ final class BitrixAdminClient
             throw new \RuntimeException('Не удалось открыть удаленную PHP-консоль.');
         }
 
-        if (preg_match('/[?&]sessid=([a-f0-9]{32})/i', $response['body'], $matches)) {
-            return $matches[1];
-        }
-
-        if (preg_match('/name=["\']sessid["\'][^>]+value=["\']([^"\']+)/i', $response['body'], $matches)) {
-            return html_entity_decode($matches[1], ENT_QUOTES | ENT_HTML5, 'UTF-8');
-        }
-
-        if (preg_match('/bitrix_sessid\(\)\s*=\s*["\']([^"\']+)/i', $response['body'], $matches)) {
-            return html_entity_decode($matches[1], ENT_QUOTES | ENT_HTML5, 'UTF-8');
-        }
-
-        throw new \RuntimeException('Не удалось получить sessid удаленной PHP-консоли.');
+        return $this->extractSessid($response['body']);
     }
 
     /**
