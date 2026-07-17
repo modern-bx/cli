@@ -9,6 +9,8 @@ use ModernBx\Cli\App\Service\CommandFinder;
 use ModernBx\Cli\App\Service\ConfigurationService;
 use ModernBx\Cli\App\Service\DynamicCommandLoader;
 use ModernBx\Cli\App\Service\RuntimeInfo;
+use ModernBx\Cli\App\Service\Sql\MySqlDumper;
+use ModernBx\Cli\App\Service\Sql\MySqlExecutor;
 use Psr\Container\ContainerInterface;
 use Symfony\Component\Console\Application;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
@@ -56,6 +58,12 @@ final class DefaultContainerBuilder
 
         $this->containerBuilder
             ->autowire(ConfigurationService::class, ConfigurationService::class);
+
+        $this->containerBuilder
+            ->autowire(MySqlDumper::class, MySqlDumper::class);
+
+        $this->containerBuilder
+            ->autowire(MySqlExecutor::class, MySqlExecutor::class);
 
         $runtimeInfo = $this->containerBuilder
             ->autowire(RuntimeInfo::class, RuntimeInfo::class);

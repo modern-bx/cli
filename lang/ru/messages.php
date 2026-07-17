@@ -74,5 +74,22 @@ return [
     'error.site.update_json_string' => 'Значения обновления должны быть JSON-строкой объекта.',
     'error.site.update_invalid_json' => 'Значения обновления содержат некорректный JSON: %message%',
     'error.site.update_object' => 'Значения обновления должны быть JSON-объектом.',
+
+    'command.sql_dump.description' => 'Сдампить базу данных проекта в SQL-файл',
+    'command.sql_dump.help' => 'Создает SQL-дамп MySQL 8.0 средствами PHP без вызова mysqldump. ' .
+        'Параметры подключения берутся из .settings.php или php_interface/dbconn.php.',
+    'argument.sql_dump.file' => 'Путь к SQL-файлу дампа',
+    'error.sql_dump.file_string' => 'Путь к SQL-файлу должен быть непустой строкой.',
+    'message.sql_dump.created' => 'SQL-дамп создан: %file%',
+    'command.sql_apply.description' => 'Выполнить SQL-файл в базе данных проекта',
+    'command.sql_apply.help' => 'Выполняет SQL-файл в контексте MySQL-базы приложения средствами PHP ' .
+        'без внешних утилит.',
+    'argument.sql_apply.file' => 'Путь к SQL-файлу для выполнения',
+    'error.sql_apply.file_string' => 'Путь к SQL-файлу должен быть непустой строкой.',
+    'message.sql_apply.applied' => 'SQL-файл выполнен: %file%',
+    'command.sql_wipe.description' => 'Стереть все данные из базы данных проекта',
+    'command.sql_wipe.help' => 'Очищает все таблицы MySQL-базы приложения через TRUNCATE средствами PHP ' .
+        'без внешних утилит.',
+    'message.sql_wipe.done' => 'Данные удалены из таблиц: %count%',
     'error.bitrix.not_found' => 'Установка Bitrix не найдена.',
 ];
