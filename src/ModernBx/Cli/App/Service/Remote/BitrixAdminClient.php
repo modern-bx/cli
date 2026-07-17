@@ -68,6 +68,12 @@ final class BitrixAdminClient
             throw new \RuntimeException('REMOTE_SESSION_EXPIRED');
         }
 
+        $sqlError = $this->extractSqlError($response['body']);
+
+        if ($sqlError !== null) {
+            throw new \RuntimeException($sqlError, 1);
+        }
+
         if (($response['status'] < 200 || $response['status'] >= 400)
             && !$this->hasSqlResult($response['body'])
         ) {
@@ -151,6 +157,30 @@ final class BitrixAdminClient
             'Referer: ' . $endpoint . '/bitrix/admin/sql.php?lang=ru&del_query=Y',
             'Cookie: PHPSESSID=' . $sessionId,
         ];
+    }
+
+
+    protected function extractSqlError(string $body): ?string
+    {
+        $errorPattern = '/<div[^>]+class=["\'][^"\']*adm-info-message-wrap[^"\']*'
+            . 'adm-info-message-red[^"\']*["\'][^>]*>(.*?)<\/div>\s*'
+            . '<div[^>]+class=["\'][^"\']*adm-list-table-wrap/is';
+
+        if (!preg_match($errorPattern, $body, $matches)) {
+            return null;
+        }
+
+        $message = preg_replace('/<script\b[^>]*>.*?<\/script>/is', '', $matches[1]) ?? $matches[1];
+        $message = preg_replace('/<style\b[^>]*>.*?<\/style>/is', '', $message) ?? $message;
+        $message = preg_replace('/<\/div>/i', "\n", $message) ?? $message;
+        $message = preg_replace('/<br\s*\/?\s*>/i', "\n", $message) ?? $message;
+        $message = strip_tags($message);
+        $message = html_entity_decode($message, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $message = preg_replace('/[ \t]+/', ' ', $message) ?? $message;
+        $message = preg_replace('/\h*\R\h*/', "\n", $message) ?? $message;
+        $message = trim($message);
+
+        return $message !== '' ? $message : null;
     }
 
     protected function hasSqlResult(string $body): bool
