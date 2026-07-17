@@ -259,6 +259,7 @@ final class BitrixAdminClient
         $body = preg_replace('/<style\b[^>]*>.*?<\/style>/is', '', $body) ?? $body;
         $body = strip_tags($body);
         $body = html_entity_decode($body, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $body = strip_tags($body);
         $body = preg_replace('/\R{3,}/', "\n\n", $body) ?? $body;
 
         return trim($body);
