@@ -64,6 +64,12 @@ npm run preview
 
 После `npm run preview` VitePress выведет локальный URL для просмотра собранной документации. Для режима разработки используйте `npm run dev`.
 
+### Публикация документации на GitHub Pages
+
+В репозитории добавлен workflow `.github/workflows/docs-pages.yml`, который собирает `site` и публикует статическую сборку на GitHub Pages. Публикация запускается только если в GitHub Actions Variables задана переменная `USE_GITHUB_PAGES` с непустым значением.
+
+Для кастомного домена можно дополнительно задать Actions Variable `GITHUB_PAGES_CNAME` со значением домена, например `docs.example.com`; workflow добавит файл `CNAME` в артефакт Pages.
+
 ## Лицензия
 
 Apache 2.0.

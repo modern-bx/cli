@@ -1,0 +1,67 @@
+name: Publish documentation to GitHub Pages
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+
+# Pages deployment needs these explicit permissions when using actions/deploy-pages.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Prevent two documentation deployments from racing each other.
+concurrency:
+  group: github-pages-docs
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Build and publish VitePress site
+    runs-on: ubuntu-latest
+    # The repository variable is an explicit feature flag: if USE_GITHUB_PAGES is
+    # absent or empty, the whole publishing job is skipped and no Pages deploy is attempted.
+    if: ${{ vars.USE_GITHUB_PAGES != '' }}
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: site/package-lock.json
+
+      - name: Install documentation dependencies
+        working-directory: site
+        run: npm ci
+
+      - name: Build VitePress documentation
+        working-directory: site
+        run: npm run build
+
+      - name: Add custom domain CNAME
+        # GitHub Pages also stores the custom domain in repository settings, but
+        # adding CNAME to the artifact keeps the domain attached on every deploy.
+        # Set repository variable GITHUB_PAGES_CNAME to your domain, for example docs.example.com.
+        if: ${{ vars.GITHUB_PAGES_CNAME != '' }}
+        run: printf '%s\n' '${{ vars.GITHUB_PAGES_CNAME }}' > site/dist/CNAME
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload GitHub Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site/dist
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
