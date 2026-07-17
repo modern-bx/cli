@@ -6,6 +6,7 @@ namespace ModernBx\Cli\App\Console\Command\Db;
 
 use ModernBx\Cli\App\Service\Db\MySqlExecutor;
 use ModernBx\Cli\App\Service\Db\PgSqlExecutor;
+use Symfony\Component\Console\Helper\Table;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 
@@ -46,9 +47,17 @@ class ExecCommand extends DbCommand
         $config = $this->getConnectionConfig();
 
         if ($config['type'] === 'postgres') {
-            $this->pgSqlExecutor->execute($config, $sql);
+            $results = $this->pgSqlExecutor->execute($config, $sql);
         } else {
-            $this->mySqlExecutor->execute($config, $sql);
+            $results = $this->mySqlExecutor->execute($config, $sql);
+        }
+
+        foreach ($results as $result) {
+            $table = new Table($output);
+            $table
+                ->setHeaders($result['columns'])
+                ->setRows($result['rows'])
+                ->render();
         }
     }
 }
