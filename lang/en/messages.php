@@ -72,5 +72,24 @@ return [
     'error.site.update_json_string' => 'Update values must be a JSON object string.',
     'error.site.update_invalid_json' => 'Update values contain invalid JSON: %message%',
     'error.site.update_object' => 'Update values must be a JSON object.',
+
+    'command.db_dump.description' => 'Dump project database to a SQL file',
+    'command.db_dump.help' => 'Creates a MySQL 8.0/PostgreSQL SQL dump using PHP only without calling mysqldump. ' .
+        'Connection settings are read from .settings.php or php_interface/dbconn.php.',
+    'argument.db_dump.file' => 'Path to SQL dump file',
+    'error.db_dump.file_string' => 'SQL dump file path must be a non-empty string.',
+    'message.db_dump.created' => 'SQL dump has been created: %file%',
+    'command.db_apply.description' => 'Execute SQL file in the project database',
+    'command.db_apply.help' => 'Executes a SQL file in the application MySQL/PostgreSQL database using PHP only ' .
+        'without external tools.',
+    'argument.db_apply.file' => 'Path to SQL file to execute',
+    'error.db_apply.file_string' => 'SQL file path must be a non-empty string.',
+    'message.db_apply.applied' => 'SQL file has been executed: %file%',
+    'command.db_wipe.description' => 'Delete all data from the project database',
+    'command.db_wipe.help' => 'Empties all application MySQL/PostgreSQL database tables with TRUNCATE ' .
+        'using PHP only without external tools.',
+    'message.db_wipe.done' => 'Data has been removed from tables: %count%',
+    'option.db.table' => 'Comma-separated table list. For PostgreSQL, schema.table is supported.',
+    'error.db.table_string' => 'Table list must be a non-empty string.',
     'error.bitrix.not_found' => 'Bitrix installation has not been found.',
 ];
