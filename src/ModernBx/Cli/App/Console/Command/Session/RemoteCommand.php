@@ -43,7 +43,8 @@ class RemoteCommand extends AppCommand
         if ($unset) {
             putenv(static::ENV_REMOTE);
             unset($_SERVER[static::ENV_REMOTE]);
-            $this->printer->info('unset ' . static::ENV_REMOTE);
+            $this->unsetSessionRemote();
+            $this->printer->info('Remote текущей терминальной сессии сброшен.');
             return;
         }
 
@@ -70,6 +71,7 @@ class RemoteCommand extends AppCommand
 
         putenv(static::ENV_REMOTE . '=' . $remote);
         $_SERVER[static::ENV_REMOTE] = $remote;
-        $this->printer->info(sprintf("export %s='%s'", static::ENV_REMOTE, str_replace("'", "'\\''", $remote)));
+        $this->setSessionRemote($remote);
+        $this->printer->info(sprintf('Remote текущей терминальной сессии: %s', $remote));
     }
 }

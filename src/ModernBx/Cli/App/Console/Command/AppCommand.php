@@ -16,6 +16,8 @@ use Symfony\Contracts\Translation\TranslatorInterface;
 class AppCommand extends GenericCommand
 {
     const ENV_REMOTE = 'BX_CLI_REMOTE';
+    const SESSION_REMOTE_DIR = 'modern-bx-cli';
+    const SESSION_REMOTE_FILE_PREFIX = 'remote-';
 
     const CODE_SUCCESS = 0;
     const CODE_INVALID_ARGUMENT_VALUE = 1;
@@ -139,10 +141,84 @@ class AppCommand extends GenericCommand
         $remote = getenv(static::ENV_REMOTE) ?: ($_SERVER[static::ENV_REMOTE] ?? null);
 
         if (!is_string($remote) || trim($remote) === '') {
+            $remote = $this->readSessionRemote();
+        }
+
+        if (!is_string($remote) || trim($remote) === '') {
             return null;
         }
 
         return trim($remote);
+    }
+
+    protected function setSessionRemote(string $remote): void
+    {
+        $path = $this->getSessionRemoteFilePath();
+        $directory = dirname($path);
+
+        if (!is_dir($directory) && !mkdir($directory, 0700, true) && !is_dir($directory)) {
+            throw new \RuntimeException(
+                sprintf('Не удалось создать директорию: %s', $directory),
+                static::CODE_IO_ERROR,
+            );
+        }
+
+        if (file_put_contents($path, $remote . PHP_EOL, LOCK_EX) === false) {
+            throw new \RuntimeException(
+                sprintf('Не удалось сохранить remote сессии: %s', $path),
+                static::CODE_IO_ERROR,
+            );
+        }
+    }
+
+    protected function unsetSessionRemote(): void
+    {
+        $path = $this->getSessionRemoteFilePath();
+
+        if (is_file($path) && !unlink($path)) {
+            throw new \RuntimeException(sprintf('Не удалось удалить remote сессии: %s', $path), static::CODE_IO_ERROR);
+        }
+    }
+
+    protected function readSessionRemote(): ?string
+    {
+        $path = $this->getSessionRemoteFilePath();
+
+        if (!is_file($path)) {
+            return null;
+        }
+
+        $remote = file_get_contents($path);
+
+        return $remote === false ? null : trim($remote);
+    }
+
+    protected function getSessionRemoteFilePath(): string
+    {
+        return $this->getSessionRemoteDirectory()
+            . DIRECTORY_SEPARATOR
+            . static::SESSION_REMOTE_FILE_PREFIX
+            . hash('sha256', $this->getTerminalSessionId());
+    }
+
+    protected function getSessionRemoteDirectory(): string
+    {
+        return sys_get_temp_dir() . DIRECTORY_SEPARATOR . static::SESSION_REMOTE_DIR;
+    }
+
+    protected function getTerminalSessionId(): string
+    {
+        $tty = function_exists('posix_ttyname') ? @posix_ttyname(STDIN) : false;
+
+        if (is_string($tty) && $tty !== '') {
+            return 'tty:' . $tty;
+        }
+
+        if (function_exists('posix_getppid')) {
+            return 'ppid:' . (string) posix_getppid();
+        }
+
+        return 'pid:' . (string) getmypid();
     }
 
     /**
