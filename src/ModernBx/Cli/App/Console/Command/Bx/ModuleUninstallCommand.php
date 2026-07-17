@@ -10,20 +10,20 @@ use Symfony\Component\Console\Input\InputDefinition;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 
-class ModuleInstallCommand extends KernelCommand
+class ModuleUninstallCommand extends KernelCommand
 {
     use ModuleLifecycle;
 
     /**
      * @var string
      */
-    protected static $defaultName = 'module:install';
+    protected static $defaultName = 'module:uninstall';
 
     protected function configure(): void
     {
         $this
-            ->setDescription($this->trans("command.module_install.description"))
-            ->setHelp($this->trans("command.module_install.help"))
+            ->setDescription($this->trans("command.module_uninstall.description"))
+            ->setHelp($this->trans("command.module_uninstall.help"))
             ->setDefinition(
                 new InputDefinition([
                     new InputArgument(
@@ -45,6 +45,6 @@ class ModuleInstallCommand extends KernelCommand
     {
         parent::executeInternal($input, $output);
 
-        $this->installModule($this->getModuleCode($input->getArgument("module")));
+        $this->uninstallModule($this->getModuleCode($input->getArgument("module")));
     }
 }
