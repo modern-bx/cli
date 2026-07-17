@@ -29,6 +29,11 @@ class RegisterCommand extends AppCommand
                         InputArgument::REQUIRED,
                         'Endpoint проекта в формате http(s)://host.tld[:port]',
                     ),
+                    new InputArgument(
+                        'codename',
+                        InputArgument::OPTIONAL,
+                        'Кодовое имя проекта',
+                    ),
                 ]),
             );
     }
@@ -40,8 +45,9 @@ class RegisterCommand extends AppCommand
         /** @var string $endpoint */
         $endpoint = $input->getArgument('endpoint');
         $endpoint = $this->normalizeEndpoint($endpoint);
-        $projectName = $this->makeProjectName($endpoint);
-        $configFile = $this->getProjectConfigFile($projectName);
+        $projectsDir = $this->getProjectsDir();
+        $projectName = $this->resolveProjectName($input, $projectsDir);
+        $configFile = $this->getProjectConfigFile($projectsDir, $projectName);
 
         if (is_file($configFile)) {
             $this->printer->info(sprintf('Предупреждение: конфигурация проекта уже существует: %s', $configFile));
@@ -102,22 +108,113 @@ class RegisterCommand extends AppCommand
         return $normalized;
     }
 
-    protected function makeProjectName(string $endpoint): string
+    protected function resolveProjectName(InputInterface $input, string $projectsDir): string
     {
-        $parts = parse_url($endpoint);
-        $name = strtolower((string) ($parts['host'] ?? 'project'));
+        /** @var string|null $codename */
+        $codename = $input->getArgument('codename');
 
-        if (isset($parts['port'])) {
-            $name .= '-' . $parts['port'];
+        if ($codename !== null) {
+            $codename = trim($codename);
+
+            if (!$this->isValidProjectName($codename)) {
+                throw new \RuntimeException(
+                    'Кодовое имя проекта должно содержать только латинские буквы, цифры, точки, дефисы '
+                    . 'и подчеркивания.',
+                    static::CODE_INVALID_ARGUMENT_VALUE,
+                );
+            }
+
+            return $codename;
         }
 
-        $name = (string) preg_replace('/[^a-z0-9._-]+/', '-', $name);
-        $name = trim($name, '.-_');
-
-        return $name !== '' ? $name : 'project';
+        return $this->generateProjectName($projectsDir);
     }
 
-    protected function getProjectConfigFile(string $projectName): string
+    protected function isValidProjectName(string $projectName): bool
+    {
+        return (bool) preg_match('/^[a-z0-9][a-z0-9._-]*$/', $projectName);
+    }
+
+    protected function generateProjectName(string $projectsDir): string
+    {
+        $adjectives = $this->getProjectNameAdjectives();
+        $nouns = $this->getProjectNameNouns();
+        $variants = [];
+
+        foreach ($adjectives as $adjective) {
+            foreach ($nouns as $noun) {
+                $variants[] = $adjective . '-' . $noun;
+            }
+        }
+
+        while ($variants !== []) {
+            $index = random_int(0, count($variants) - 1);
+            $projectName = $variants[$index];
+
+            if (!$this->projectConfigExists($projectsDir, $projectName)) {
+                return $projectName;
+            }
+
+            array_splice($variants, $index, 1);
+        }
+
+        throw new \RuntimeException(
+            'Не удалось подобрать свободное кодовое имя проекта: все варианты заняты.',
+            static::CODE_IO_ERROR,
+        );
+    }
+
+    /**
+     * @return string[]
+     */
+    protected function getProjectNameAdjectives(): array
+    {
+        return [
+            'brave',
+            'bright',
+            'calm',
+            'clever',
+            'cosmic',
+            'eager',
+            'gentle',
+            'golden',
+            'happy',
+            'lucky',
+            'merry',
+            'nimble',
+            'proud',
+            'rapid',
+            'silent',
+            'silver',
+        ];
+    }
+
+    /**
+     * @return string[]
+     */
+    protected function getProjectNameNouns(): array
+    {
+        return [
+            'badger',
+            'beaver',
+            'cougar',
+            'dolphin',
+            'eagle',
+            'falcon',
+            'fox',
+            'lynx',
+            'otter',
+            'panda',
+            'raven',
+            'tiger',
+            'turtle',
+            'whale',
+            'wolf',
+            'zebra',
+        ];
+    }
+
+    protected function getProjectsDir(): string
     {
         $home = getenv('HOME') ?: ($_SERVER['HOME'] ?? null);
 
@@ -125,7 +222,17 @@ class RegisterCommand extends AppCommand
             throw new \RuntimeException('Не удалось определить домашний каталог пользователя.', static::CODE_IO_ERROR);
         }
 
-        return rtrim($home, '/') . '/.config/bx-cli/projects/' . $projectName . '/project.yaml';
+        return rtrim($home, '/') . '/.config/bx-cli/projects';
+    }
+
+    protected function getProjectConfigFile(string $projectsDir, string $projectName): string
+    {
+        return rtrim($projectsDir, '/') . '/' . $projectName . '/project.yaml';
+    }
+
+    protected function projectConfigExists(string $projectsDir, string $projectName): bool
+    {
+        return is_file($this->getProjectConfigFile($projectsDir, $projectName));
     }
 
     /**
