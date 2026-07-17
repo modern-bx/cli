@@ -6,7 +6,7 @@ namespace ModernBx\Cli\App\Console\Command\File;
 
 use ModernBx\Cli\App\Console\Command\BxCommand;
 use ModernBx\Cli\App\Service\Remote\BitrixAdminClient;
-use ModernBx\Cli\App\Service\Remote\ProjectRegistry;
+use ModernBx\Cli\App\Service\Remote\RemoteProjectConfigManager;
 use Symfony\Component\Console\Helper\ProgressBar;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
@@ -19,15 +19,17 @@ class GetCommand extends BxCommand
 
     private const PROGRESS_BAR_THRESHOLD = 1048576;
 
-    protected ProjectRegistry $projectRegistry;
+    protected RemoteProjectConfigManager $remoteProjectConfigManager;
 
     protected BitrixAdminClient $bitrixAdminClient;
 
-    public function __construct(ProjectRegistry $projectRegistry, BitrixAdminClient $bitrixAdminClient)
-    {
+    public function __construct(
+        RemoteProjectConfigManager $remoteProjectConfigManager,
+        BitrixAdminClient $bitrixAdminClient
+    ) {
         parent::__construct();
 
-        $this->projectRegistry = $projectRegistry;
+        $this->remoteProjectConfigManager = $remoteProjectConfigManager;
         $this->bitrixAdminClient = $bitrixAdminClient;
     }
 
@@ -86,14 +88,12 @@ class GetCommand extends BxCommand
 
     protected function executeRemote(string $codename, string $src, string $dest, OutputInterface $output): void
     {
-        $config = $this->projectRegistry->load($codename);
-        $project = $this->getProjectConfig($config);
-        $account = $this->getDefaultAccountConfig($project);
-        $endpoint = $this->readString($project, 'endpoint');
-        $sessionId = $this->readString($this->getSessionCookieConfig($account), 'value');
+        $config = $this->remoteProjectConfigManager->load($codename);
+        $endpoint = $this->remoteProjectConfigManager->getEndpoint($config);
+        $sessionId = $this->remoteProjectConfigManager->getSessionId($config);
 
         if ($sessionId === '') {
-            $sessionId = $this->refreshRemoteSession($codename, $config, $project, $account);
+            $sessionId = $this->remoteProjectConfigManager->refreshSession($codename, $config);
         }
 
         $progressBar = null;
@@ -120,7 +120,7 @@ class GetCommand extends BxCommand
                 throw $err;
             }
 
-            $sessionId = $this->refreshRemoteSession($codename, $config, $project, $account);
+            $sessionId = $this->remoteProjectConfigManager->refreshSession($codename, $config);
             $this->bitrixAdminClient->downloadFile($endpoint, $sessionId, $src, $dest, $progressFactory);
         } finally {
             if ($progressBar !== null) {
@@ -195,98 +195,5 @@ class GetCommand extends BxCommand
                 static::CODE_IO_ERROR,
             );
         }
-    }
-
-    /**
-     * @param array<string, mixed> $config
-     * @return array<string, mixed>
-     */
-    protected function getProjectConfig(array $config): array
-    {
-        $data = $config['data'] ?? null;
-        $project = is_array($data) ? ($data['project'] ?? null) : null;
-
-        if (!is_array($project)) {
-            throw new \RuntimeException('Некорректная конфигурация удаленного проекта.');
-        }
-
-        return $project;
-    }
-
-    /**
-     * @param array<string, mixed> $project
-     * @return array<string, mixed>
-     */
-    protected function getDefaultAccountConfig(array $project): array
-    {
-        $accounts = $project['accounts'] ?? null;
-        $account = is_array($accounts) ? ($accounts['default'] ?? null) : null;
-
-        if (!is_array($account)) {
-            throw new \RuntimeException('В конфигурации удаленного проекта нет аккаунта default.');
-        }
-
-        return $account;
-    }
-
-    /**
-     * @param array<string, mixed> $account
-     * @return array<string, mixed>
-     */
-    protected function getSessionCookieConfig(array $account): array
-    {
-        $cookies = $account['cookies'] ?? [];
-        $cookie = is_array($cookies) ? ($cookies['PHPSESSID'] ?? []) : [];
-
-        return is_array($cookie) ? $cookie : [];
-    }
-
-    /** @param array<string, mixed> $values */
-    protected function readString(array $values, string $key): string
-    {
-        $value = $values[$key] ?? '';
-
-        return is_string($value) ? $value : '';
-    }
-
-    /**
-     * @param array<string, mixed> $config
-     * @param array<string, mixed> $project
-     * @param array<string, mixed> $account
-     */
-    protected function refreshRemoteSession(string $codename, array &$config, array $project, array $account): string
-    {
-        $endpoint = $this->readString($project, 'endpoint');
-        $login = $this->readString($account, 'login');
-        $password = $this->readString($account, 'password');
-
-        if ($endpoint === '' || $login === '' || $password === '') {
-            throw new \RuntimeException('Некорректные учетные данные удаленного проекта.');
-        }
-
-        $cookie = $this->bitrixAdminClient->login($endpoint, $login, $password);
-        $this->writeSessionCookieConfig($config, $cookie);
-        $this->projectRegistry->save($codename, $config);
-
-        return $cookie['value'];
-    }
-
-    /**
-     * @param array<string, mixed> $config
-     * @param array{value: string, expires: string} $cookie
-     */
-    protected function writeSessionCookieConfig(array &$config, array $cookie): void
-    {
-        $data = is_array($config['data'] ?? null) ? $config['data'] : [];
-        $project = is_array($data['project'] ?? null) ? $data['project'] : [];
-        $accounts = is_array($project['accounts'] ?? null) ? $project['accounts'] : [];
-        $default = is_array($accounts['default'] ?? null) ? $accounts['default'] : [];
-        $cookies = is_array($default['cookies'] ?? null) ? $default['cookies'] : [];
-        $cookies['PHPSESSID'] = $cookie;
-        $default['cookies'] = $cookies;
-        $accounts['default'] = $default;
-        $project['accounts'] = $accounts;
-        $data['project'] = $project;
-        $config['data'] = $data;
     }
 }

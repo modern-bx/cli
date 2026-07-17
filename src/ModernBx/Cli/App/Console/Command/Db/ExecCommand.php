@@ -6,7 +6,7 @@ namespace ModernBx\Cli\App\Console\Command\Db;
 
 use ModernBx\Cli\App\Service\Db\MySqlExecutor;
 use ModernBx\Cli\App\Service\Remote\BitrixAdminClient;
-use ModernBx\Cli\App\Service\Remote\ProjectRegistry;
+use ModernBx\Cli\App\Service\Remote\RemoteProjectConfigManager;
 use ModernBx\Cli\App\Service\Remote\RemoteSqlPhpCodeBuilder;
 use ModernBx\Cli\App\Service\Db\PgSqlExecutor;
 use Symfony\Component\Console\Helper\Table;
@@ -22,7 +22,7 @@ class ExecCommand extends DbCommand
 
     private PgSqlExecutor $pgSqlExecutor;
 
-    private ProjectRegistry $projectRegistry;
+    private RemoteProjectConfigManager $remoteProjectConfigManager;
 
     private BitrixAdminClient $bitrixAdminClient;
 
@@ -31,7 +31,7 @@ class ExecCommand extends DbCommand
     public function __construct(
         MySqlExecutor $mySqlExecutor,
         PgSqlExecutor $pgSqlExecutor,
-        ProjectRegistry $projectRegistry,
+        RemoteProjectConfigManager $remoteProjectConfigManager,
         BitrixAdminClient $bitrixAdminClient,
         RemoteSqlPhpCodeBuilder $remoteSqlPhpCodeBuilder
     ) {
@@ -39,7 +39,7 @@ class ExecCommand extends DbCommand
 
         $this->mySqlExecutor = $mySqlExecutor;
         $this->pgSqlExecutor = $pgSqlExecutor;
-        $this->projectRegistry = $projectRegistry;
+        $this->remoteProjectConfigManager = $remoteProjectConfigManager;
         $this->bitrixAdminClient = $bitrixAdminClient;
         $this->remoteSqlPhpCodeBuilder = $remoteSqlPhpCodeBuilder;
     }
@@ -95,17 +95,15 @@ class ExecCommand extends DbCommand
     protected function executeRemote(InputInterface $input, OutputInterface $output, string $codename): void
     {
         $sql = (string) stream_get_contents(STDIN);
-        $config = $this->projectRegistry->load($codename);
-        $project = $this->getProjectConfig($config);
-        $account = $this->getDefaultAccountConfig($project);
-        $endpoint = $this->readString($project, 'endpoint');
-        $sessionId = $this->readString($this->getSessionCookieConfig($account), 'value');
+        $config = $this->remoteProjectConfigManager->load($codename);
+        $endpoint = $this->remoteProjectConfigManager->getEndpoint($config);
+        $sessionId = $this->remoteProjectConfigManager->getSessionId($config);
         $page = $this->getPositiveIntOption($input, 'page', false);
         $size = $this->getPositiveIntOption($input, 'size', true) ?? 100;
         $executeViaPhp = $input->getOption('php') === true;
 
         if ($sessionId === '') {
-            $sessionId = $this->refreshRemoteSession($codename, $config, $project, $account);
+            $sessionId = $this->remoteProjectConfigManager->refreshSession($codename, $config);
         }
 
         try {
@@ -117,7 +115,7 @@ class ExecCommand extends DbCommand
                 throw $err;
             }
 
-            $sessionId = $this->refreshRemoteSession($codename, $config, $project, $account);
+            $sessionId = $this->remoteProjectConfigManager->refreshSession($codename, $config);
             $result = $executeViaPhp
                 ? $this->executeRemoteSqlViaPhp($endpoint, $sessionId, $sql, $page ?? 1, $size)
                 : $this->bitrixAdminClient->executeSql($endpoint, $sessionId, $sql, $page, $size);
@@ -177,100 +175,5 @@ class ExecCommand extends DbCommand
         }
 
         return (int) $value;
-    }
-
-    /**
-     * @param array<string, mixed> $config
-     * @return array<string, mixed>
-     */
-    protected function getProjectConfig(array $config): array
-    {
-        $data = $config['data'] ?? null;
-        $project = is_array($data) ? ($data['project'] ?? null) : null;
-
-        if (!is_array($project)) {
-            throw new \RuntimeException('Некорректная конфигурация удаленного проекта.');
-        }
-
-        return $project;
-    }
-
-    /**
-     * @param array<string, mixed> $project
-     * @return array<string, mixed>
-     */
-    protected function getDefaultAccountConfig(array $project): array
-    {
-        $accounts = $project['accounts'] ?? null;
-        $account = is_array($accounts) ? ($accounts['default'] ?? null) : null;
-
-        if (!is_array($account)) {
-            throw new \RuntimeException('В конфигурации удаленного проекта нет аккаунта default.');
-        }
-
-        return $account;
-    }
-
-    /**
-     * @param array<string, mixed> $config
-     * @param array<string, mixed> $project
-     * @param array<string, mixed> $account
-     */
-    protected function refreshRemoteSession(string $codename, array &$config, array $project, array $account): string
-    {
-        $endpoint = $this->readString($project, 'endpoint');
-        $login = $this->readString($account, 'login');
-        $password = $this->readString($account, 'password');
-
-        if ($endpoint === '' || $login === '' || $password === '') {
-            throw new \RuntimeException('Некорректные учетные данные удаленного проекта.');
-        }
-
-        $cookie = $this->bitrixAdminClient->login($endpoint, $login, $password);
-        $this->writeSessionCookieConfig($config, $cookie);
-        $this->projectRegistry->save($codename, $config);
-
-        return $cookie['value'];
-    }
-
-    /**
-     * @param array<string, mixed> $account
-     * @return array<string, mixed>
-     */
-    protected function getSessionCookieConfig(array $account): array
-    {
-        $cookies = $account['cookies'] ?? [];
-        $cookie = is_array($cookies) ? ($cookies['PHPSESSID'] ?? []) : [];
-
-        return is_array($cookie) ? $cookie : [];
-    }
-
-    /**
-     * @param array<string, mixed> $values
-     */
-    protected function readString(array $values, string $key): string
-    {
-        $value = $values[$key] ?? '';
-
-        return is_string($value) ? $value : '';
-    }
-
-    /**
-     * @param array<string, mixed> $config
-     * @param array{value: string, expires: string} $cookie
-     */
-    protected function writeSessionCookieConfig(array &$config, array $cookie): void
-    {
-        $data = is_array($config['data'] ?? null) ? $config['data'] : [];
-        $project = is_array($data['project'] ?? null) ? $data['project'] : [];
-        $accounts = is_array($project['accounts'] ?? null) ? $project['accounts'] : [];
-        $default = is_array($accounts['default'] ?? null) ? $accounts['default'] : [];
-        $cookies = is_array($default) && is_array($default['cookies'] ?? null) ? $default['cookies'] : [];
-        $cookies['PHPSESSID'] = $cookie;
-        $default['cookies'] = $cookies;
-        $accounts['default'] = $default;
-        $project['accounts'] = $accounts;
-        $data['project'] = $project;
-        $config['data'] = $data;
     }
 }
