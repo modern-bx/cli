@@ -1,5 +1,11 @@
 # modern-bx/cli
 
+[![PHP](https://img.shields.io/badge/PHP-%3E%3D%208.2-777BB4?logo=php&logoColor=white)](https://www.php.net/)
+[![Symfony Console](https://img.shields.io/badge/Symfony-Console-000000?logo=symfony&logoColor=white)](https://symfony.com/doc/current/components/console.html)
+![CLI](https://img.shields.io/badge/interface-CLI-4EAA25?logo=gnubash&logoColor=white)
+![Shell completion](https://img.shields.io/badge/shell%20completion-supported-success)
+![JSON output](https://img.shields.io/badge/output-JSON-blue)
+
 Модульный консольный хелпер для автоматизации работы с Bitrix и другими фреймворками.
 
 ## Использование
