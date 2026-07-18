@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace ModernBx\Cli\App\Console\Command\Remote;
+namespace ModernBx\Cli\App\Console\Command\Core\Remote;
 
 use ModernBx\Cli\App\Console\Command\AppCommand;
 use ModernBx\Cli\App\Service\Remote\ProjectRegistry;

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace ModernBx\Cli\App\Console\Command\File;
+namespace ModernBx\Cli\App\Console\Command\Bx\File;
 
 use ModernBx\Cli\App\Console\Command\BxCommand;
 use ModernBx\Cli\App\Service\Remote\BitrixAdminClient;

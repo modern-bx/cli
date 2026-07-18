@@ -253,6 +253,6 @@ class SiteUpdateCommand extends KernelCommand
 
     private function getFieldsSchemaPath(): string
     {
-        return __DIR__ . '/Validation/SiteUpdateFields.schema.json';
+        return dirname(__DIR__) . '/Validation/SiteUpdateFields.schema.json';
     }
 }

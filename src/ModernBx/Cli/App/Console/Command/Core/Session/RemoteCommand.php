@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace ModernBx\Cli\App\Console\Command\Session;
+namespace ModernBx\Cli\App\Console\Command\Core\Session;
 
 use ModernBx\Cli\App\Console\Command\AppCommand;
 use ModernBx\Cli\App\Service\Remote\ProjectRegistry;

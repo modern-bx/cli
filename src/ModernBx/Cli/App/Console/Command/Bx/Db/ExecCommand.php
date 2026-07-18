@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace ModernBx\Cli\App\Console\Command\Db;
+namespace ModernBx\Cli\App\Console\Command\Bx\Db;
 
 use ModernBx\Cli\App\Service\Db\MySqlExecutor;
 use ModernBx\Cli\App\Service\Remote\BitrixAdminClient;

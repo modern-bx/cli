@@ -4,7 +4,7 @@
 
 declare(strict_types=1);
 
-namespace ModernBx\Cli\App\Console\Command\Completion;
+namespace ModernBx\Cli\App\Console\Command\Core\Completion;
 
 use ModernBx\Cli\App\Console\Command\AppCommand;
 use Symfony\Component\Console\Input\InputArgument;
