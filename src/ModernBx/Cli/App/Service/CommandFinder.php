@@ -46,7 +46,7 @@ final class CommandFinder
 
         $finder
             ->files()
-            ->name("*.php")
+            ->name("*" . $this->suffix . ".php")
             ->in($_SERVER["DOCUMENT_ROOT"] . "/src/" . $this->namespace);
 
         if ($finder->hasResults()) {
