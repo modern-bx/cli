@@ -4,8 +4,9 @@
 
 declare(strict_types=1);
 
-namespace ModernBx\Cli\App\Console\Command\Bx;
+namespace ModernBx\Cli\App\Console\Command\Bx\Site;
 
+use ModernBx\Cli\App\Console\Command\Bx\KernelCommand;
 use ModernBx\Cli\App\Console\Mixin\Common\IO;
 use ModernBx\Cli\App\Service\ClassAliasLoader;
 use ModernBx\Cli\App\Service\Remote\BitrixAdminClient;
@@ -19,7 +20,7 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 
-class SiteUpdateCommand extends KernelCommand
+class UpdateCommand extends KernelCommand
 {
     use IO;
     use RemotePhpTrait;
@@ -253,6 +254,6 @@ class SiteUpdateCommand extends KernelCommand
 
     private function getFieldsSchemaPath(): string
     {
-        return dirname(__DIR__) . '/Validation/SiteUpdateFields.schema.json';
+        return dirname(__DIR__, 2) . '/Validation/SiteUpdateFields.schema.json';
     }
 }

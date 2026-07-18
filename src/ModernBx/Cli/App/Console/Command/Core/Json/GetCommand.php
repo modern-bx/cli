@@ -4,7 +4,7 @@
 
 declare(strict_types=1);
 
-namespace ModernBx\Cli\App\Console\Command\Core;
+namespace ModernBx\Cli\App\Console\Command\Core\Json;
 
 use ModernBx\Cli\App\Console\Command\AppCommand;
 use ModernBx\Cli\App\Service\JsonPath;
@@ -17,7 +17,7 @@ use Symfony\Component\Console\Output\OutputInterface;
 use function ModernBx\CommonFunctions\from_json;
 use function ModernBx\CommonFunctions\to_json;
 
-class JsonGetCommand extends AppCommand
+class GetCommand extends AppCommand
 {
     /**
      * @var string

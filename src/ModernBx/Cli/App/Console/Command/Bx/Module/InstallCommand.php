@@ -2,8 +2,9 @@
 
 declare(strict_types=1);
 
-namespace ModernBx\Cli\App\Console\Command\Bx;
+namespace ModernBx\Cli\App\Console\Command\Bx\Module;
 
+use ModernBx\Cli\App\Console\Command\Bx\KernelCommand;
 use ModernBx\Cli\App\Console\Mixin\Bx\ModuleLifecycle;
 use ModernBx\Cli\App\Console\Mixin\Bx\ModuleLifecycleWarningCode;
 use Symfony\Component\Console\Input\InputArgument;
@@ -11,20 +12,20 @@ use Symfony\Component\Console\Input\InputDefinition;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 
-class ModuleReinstallCommand extends KernelCommand
+class InstallCommand extends KernelCommand
 {
     use ModuleLifecycle;
 
     /**
      * @var string
      */
-    protected static $defaultName = 'module:reinstall';
+    protected static $defaultName = 'module:install';
 
     protected function configure(): void
     {
         $this
-            ->setDescription($this->trans("command.module_reinstall.description"))
-            ->setHelp($this->trans("command.module_reinstall.help"))
+            ->setDescription($this->trans("command.module_install.description"))
+            ->setHelp($this->trans("command.module_install.help"))
             ->setDefinition(
                 new InputDefinition([
                     new InputArgument(
@@ -46,24 +47,14 @@ class ModuleReinstallCommand extends KernelCommand
     {
         parent::executeInternal($input, $output);
 
-        $moduleCode = $this->getModuleCode($input->getArgument("module"));
+        $result = $this->installModule($this->getModuleCode($input->getArgument("module")));
 
-        $uninstallResult = $this->uninstallModule($moduleCode);
+        $moduleCode = $result->getModuleCode();
 
-        $uninstallWarnings = $uninstallResult->getWarnings(ModuleLifecycleWarningCode::MODULE_NOT_INSTALLED);
+        $warnings = $result->getWarnings(ModuleLifecycleWarningCode::MODULE_ALREADY_INSTALLED);
 
-        if ($uninstallWarnings) {
-            $this->printer->put($uninstallWarnings[0]->message, "comment");
-        } else {
-            $this->printer->info($this->trans("message.module.uninstalled", ["%module%" => $moduleCode]));
-        }
-
-        $installResult = $this->installModule($moduleCode);
-
-        $installWarnings = $installResult->getWarnings(ModuleLifecycleWarningCode::MODULE_ALREADY_INSTALLED);
-
-        if ($installWarnings) {
-            $this->printer->put($installWarnings[0]->message, "comment");
+        if ($warnings) {
+            $this->printer->put($warnings[0]->message, "comment");
 
             return;
         }

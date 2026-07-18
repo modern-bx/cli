@@ -4,7 +4,7 @@
 
 declare(strict_types=1);
 
-namespace ModernBx\Cli\App\Console\Command\Core;
+namespace ModernBx\Cli\App\Console\Command\Core\Env;
 
 use ModernBx\Cli\App\Console\Command\AppCommand;
 use ModernBx\Cli\App\Service\EnvFile;
@@ -13,18 +13,18 @@ use Symfony\Component\Console\Input\InputDefinition;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 
-class EnvSetCommand extends AppCommand
+class GetCommand extends AppCommand
 {
     /**
      * @var string
      */
-    protected static $defaultName = 'env:set';
+    protected static $defaultName = 'env:get';
 
     protected function configure(): void
     {
         $this
-            ->setDescription($this->trans("command.env_set.description"))
-            ->setHelp($this->trans("command.env_set.help"))
+            ->setDescription($this->trans("command.env_get.description"))
+            ->setHelp($this->trans("command.env_get.help"))
             ->setDefinition(
                 new InputDefinition([
                     new InputArgument(
@@ -36,11 +36,6 @@ class EnvSetCommand extends AppCommand
                         'key',
                         InputArgument::REQUIRED,
                         $this->trans("argument.env.key"),
-                    ),
-                    new InputArgument(
-                        'value',
-                        InputArgument::REQUIRED,
-                        $this->trans("argument.env.value"),
                     ),
                 ]),
             );
@@ -60,24 +55,12 @@ class EnvSetCommand extends AppCommand
         $file = $input->getArgument("file");
         /** @var string $key */
         $key = $input->getArgument("key");
-        /** @var string $value */
-        $value = $input->getArgument("value");
-        $content = "";
+        $content = file_get_contents($file);
 
-        if (is_file($file)) {
-            $content = file_get_contents($file);
-
-            if ($content === false) {
-                throw new \RuntimeException($this->trans("error.dotenv.read"), static::CODE_IO_ERROR);
-            }
+        if ($content === false) {
+            throw new \RuntimeException($this->trans("error.dotenv.read"), static::CODE_IO_ERROR);
         }
 
-        $content = EnvFile::set($content, $key, $value);
-
-        if (file_put_contents($file, $content) === false) {
-            throw new \RuntimeException($this->trans("error.dotenv.write"), static::CODE_IO_ERROR);
-        }
-
-        $this->printer->info($content);
+        $this->printer->info((string) EnvFile::get($content, $key));
     }
 }

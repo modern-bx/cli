@@ -2,8 +2,9 @@
 
 declare(strict_types=1);
 
-namespace ModernBx\Cli\App\Console\Command\Bx;
+namespace ModernBx\Cli\App\Console\Command\Bx\Php;
 
+use ModernBx\Cli\App\Console\Command\Bx\KernelCommand;
 use ModernBx\Cli\App\Service\ClassAliasLoader;
 use ModernBx\Cli\App\Service\Remote\BitrixAdminClient;
 use ModernBx\Cli\App\Service\Remote\RemoteProjectConfigManager;
@@ -11,7 +12,7 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 
-class PhpExecCommand extends KernelCommand
+class ExecCommand extends KernelCommand
 {
     /**
      * @var string

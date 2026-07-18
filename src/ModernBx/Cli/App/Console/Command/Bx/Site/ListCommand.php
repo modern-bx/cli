@@ -4,15 +4,15 @@
 
 declare(strict_types=1);
 
-namespace ModernBx\Cli\App\Console\Command\Bx;
+namespace ModernBx\Cli\App\Console\Command\Bx\Site;
 
+use ModernBx\Cli\App\Console\Command\Bx\KernelCommand;
 use ModernBx\Cli\App\Console\Mixin\Common\IO;
 use ModernBx\Cli\App\Service\ClassAliasLoader;
 use ModernBx\Cli\App\Service\Remote\BitrixAdminClient;
 use ModernBx\Cli\App\Service\Remote\RemoteProjectConfigManager;
 use ModernBx\Cli\App\Service\Remote\RemotePhpTrait;
 use ModernBx\Cli\App\Service\Remote\RemoteSitePhpCodeBuilder;
-use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputDefinition;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
@@ -20,7 +20,7 @@ use Symfony\Component\Console\Output\OutputInterface;
 
 use function ModernBx\CommonFunctions\to_json;
 
-class SiteGetCommand extends KernelCommand
+class ListCommand extends KernelCommand
 {
     use IO;
     use RemotePhpTrait;
@@ -43,13 +43,13 @@ class SiteGetCommand extends KernelCommand
     /**
      * @var string
      */
-    protected static $defaultName = 'site:get';
+    protected static $defaultName = 'site:list';
 
     protected function configure(): void
     {
         $this
-            ->setDescription($this->trans("command.site_get.description"))
-            ->setHelp($this->trans("command.site_get.help"))
+            ->setDescription($this->trans("command.site_list.description"))
+            ->setHelp($this->trans("command.site_list.help"))
             ->setDefinition(
                 new InputDefinition([
                     new InputOption(
@@ -57,6 +57,18 @@ class SiteGetCommand extends KernelCommand
                         null,
                         InputOption::VALUE_REQUIRED,
                         'Кодовое имя удаленного проекта',
+                    ),
+                    new InputOption(
+                        'filter',
+                        null,
+                        InputOption::VALUE_REQUIRED,
+                        $this->trans("option.site.filter"),
+                    ),
+                    new InputOption(
+                        'order',
+                        null,
+                        InputOption::VALUE_REQUIRED,
+                        $this->trans("option.site.order"),
                     ),
                     new InputOption(
                         'select',
@@ -69,11 +81,6 @@ class SiteGetCommand extends KernelCommand
                         null,
                         InputOption::VALUE_NONE,
                         $this->trans("option.json.pretty_bx"),
-                    ),
-                    new InputArgument(
-                        'id',
-                        InputArgument::REQUIRED,
-                        $this->trans("argument.site.id"),
                     ),
                 ]),
             );
@@ -102,27 +109,23 @@ class SiteGetCommand extends KernelCommand
 
     protected function executeLocal(InputInterface $input): void
     {
-        $siteId = $input->getArgument("id");
+        $query = [];
 
-        if (!is_string($siteId)) {
-            throw new \Exception($this->trans("error.site.id_string"), static::CODE_INVALID_ARGUMENT_VALUE);
-        }
+        foreach (["filter", "order", "select"] as $option) {
+            $value = $input->getOption($option);
 
-        $query = [
-            "filter" => ["=LID" => $siteId],
-            "limit" => 1,
-        ];
-        $select = $input->getOption("select");
+            if ($value === null) {
+                continue;
+            }
 
-        if ($select !== null) {
-            if (!is_string($select)) {
+            if (!is_string($value)) {
                 throw new \Exception(
-                    $this->trans("error.option_json_string", ["%option%" => "select"]),
+                    $this->trans("error.option_json_string", ["%option%" => $option]),
                     static::CODE_INVALID_OPTION_VALUE
                 );
             }
 
-            $query["select"] = $this->decodeSelectOption($select);
+            $query[$option] = $this->decodeJsonOption($option, $value);
         }
 
         $flags = JSON_UNESCAPED_UNICODE;
@@ -133,38 +136,32 @@ class SiteGetCommand extends KernelCommand
 
         /** @noinspection PhpUndefinedClassInspection */
         /** @phpstan-ignore-next-line */
-        $site = \Bitrix\Main\SiteTable::getList($query)->fetch();
+        $cursor = \Bitrix\Main\SiteTable::getList($query);
 
-        if (!$site) {
-            return;
+        while ($site = $cursor->fetch()) {
+            $this->printer->info((string) to_json($site, $flags));
         }
-
-        $this->printer->info((string) to_json($site, $flags));
     }
 
     protected function executeRemote(InputInterface $input, string $remote): void
     {
-        $siteId = $input->getArgument("id");
+        $query = [];
 
-        if (!is_string($siteId)) {
-            throw new \Exception($this->trans("error.site.id_string"), static::CODE_INVALID_ARGUMENT_VALUE);
-        }
+        foreach (["filter", "order", "select"] as $option) {
+            $value = $input->getOption($option);
 
-        $query = [
-            "filter" => ["=LID" => $siteId],
-            "limit" => 1,
-        ];
-        $select = $input->getOption("select");
+            if ($value === null) {
+                continue;
+            }
 
-        if ($select !== null) {
-            if (!is_string($select)) {
+            if (!is_string($value)) {
                 throw new \Exception(
-                    $this->trans("error.option_json_string", ["%option%" => "select"]),
+                    $this->trans("error.option_json_string", ["%option%" => $option]),
                     static::CODE_INVALID_OPTION_VALUE
                 );
             }
 
-            $query["select"] = $this->decodeSelectOption($select);
+            $query[$option] = $this->decodeJsonOption($option, $value);
         }
 
         $flags = JSON_UNESCAPED_UNICODE;
@@ -173,31 +170,35 @@ class SiteGetCommand extends KernelCommand
             $flags |= JSON_PRETTY_PRINT;
         }
 
-        $line = $this->decodeRemoteJsonResult(
-            $this->executeRemotePhp($remote, $this->remoteSitePhpCodeBuilder->buildGet($query, $flags)),
-            'Не удалось получить сайт удаленного проекта.',
+        $result = $this->decodeRemoteJsonResult(
+            $this->executeRemotePhp($remote, $this->remoteSitePhpCodeBuilder->buildList($query, $flags)),
+            'Не удалось получить список сайтов удаленного проекта.',
         );
 
-        if ($line === null) {
-            return;
+        if (!is_array($result)) {
+            throw new \RuntimeException('Удаленная PHP-консоль вернула некорректный список сайтов.');
         }
 
-        $this->printer->info(is_scalar($line) ? (string) $line : '');
+        foreach ($result as $line) {
+            $this->printer->info(is_scalar($line) ? (string) $line : '');
+        }
     }
 
+
     /**
+     * @param string $option
      * @param string $value
      * @return mixed
      * @throws \Exception
      */
-    private function decodeSelectOption(string $value): mixed
+    private function decodeJsonOption(string $option, string $value): mixed
     {
         $decoded = json_decode($value, true);
 
         if (json_last_error() !== JSON_ERROR_NONE) {
             throw new \Exception(
                 $this->trans("error.option_invalid_json", [
-                    "%option%" => "select",
+                    "%option%" => $option,
                     "%message%" => json_last_error_msg(),
                 ]),
                 static::CODE_INVALID_OPTION_VALUE

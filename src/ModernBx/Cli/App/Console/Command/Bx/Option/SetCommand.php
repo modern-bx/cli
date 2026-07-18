@@ -4,15 +4,16 @@
 
 declare(strict_types=1);
 
-namespace ModernBx\Cli\App\Console\Command\Bx;
+namespace ModernBx\Cli\App\Console\Command\Bx\Option;
 
+use ModernBx\Cli\App\Console\Command\Bx\KernelCommand;
 use ModernBx\Cli\App\Console\Mixin\Common\IO;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputDefinition;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 
-class OptionSetCommand extends KernelCommand
+class SetCommand extends KernelCommand
 {
     use IO;
 
