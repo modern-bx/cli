@@ -19,14 +19,33 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  check-pages-flag:
+    name: Check GitHub Pages feature flag
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+    outputs:
+      enabled: ${{ steps.flag.outputs.enabled }}
+    steps:
+      - name: Read USE_GITHUB_PAGES
+        id: flag
+        run: |
+          if [ "${USE_GITHUB_PAGES}" = "true" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          fi
+        env:
+          USE_GITHUB_PAGES: ${{ vars.USE_GITHUB_PAGES }}
+
   publish:
     name: Build and publish VitePress site
     runs-on: ubuntu-latest
-    # The repository variable is an explicit feature flag. GitHub exposes an
-    # undefined repository variable as an empty string, so requiring the exact
-    # value "true" prevents accidental deploys when the variable is missing,
-    # empty, or set to a placeholder such as "false".
-    if: ${{ vars.USE_GITHUB_PAGES == 'true' }}
+    needs: check-pages-flag
+    # The repository/environment variable is an explicit feature flag. The
+    # check-pages-flag job reads it after entering the github-pages environment,
+    # so environment-scoped variables are supported as well as repository variables.
+    if: ${{ needs.check-pages-flag.outputs.enabled == 'true' }}
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
