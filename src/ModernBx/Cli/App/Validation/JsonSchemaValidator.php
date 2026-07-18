@@ -12,6 +12,13 @@ namespace ModernBx\Cli\App\Validation;
  */
 final class JsonSchemaValidator
 {
+    private ?\Closure $translator;
+
+    public function __construct(?callable $translator = null)
+    {
+        $this->translator = $translator === null ? null : \Closure::fromCallable($translator);
+    }
+
     /**
      * @param mixed $value
      * @param array<string, mixed> $schema
@@ -41,7 +48,7 @@ final class JsonSchemaValidator
         }
 
         if (!is_array($schema['$mixin'])) {
-            throw new \InvalidArgumentException('JSON Schema $mixin must be an array of strings.');
+            throw new \InvalidArgumentException($this->trans('error.validation.mixin_array'));
         }
 
         $mergedSchema = $schema;
@@ -49,20 +56,20 @@ final class JsonSchemaValidator
 
         foreach ($schema['$mixin'] as $mixinPath) {
             if (!is_string($mixinPath)) {
-                throw new \InvalidArgumentException('JSON Schema $mixin must contain only strings.');
+                throw new \InvalidArgumentException($this->trans('error.validation.mixin_string'));
             }
 
             $mixedSchemaPath = $this->resolveMixinPath($mixinPath, $baseDirectory);
             if (in_array($mixedSchemaPath, $mixinStack, true)) {
                 throw new \InvalidArgumentException(
-                    sprintf('Circular JSON Schema mixin detected: %s', $mixedSchemaPath)
+                    $this->trans('error.validation.mixin_circular', ['%file%' => $mixedSchemaPath])
                 );
             }
 
             $mixedSchemaJson = file_get_contents($mixedSchemaPath);
             if ($mixedSchemaJson === false) {
                 throw new \InvalidArgumentException(
-                    sprintf('Unable to read mixed JSON Schema: %s', $mixedSchemaPath)
+                    $this->trans('error.validation.mixin_read', ['%file%' => $mixedSchemaPath])
                 );
             }
 
@@ -72,7 +79,7 @@ final class JsonSchemaValidator
                 || ($mixedSchema !== [] && array_is_list($mixedSchema))
             ) {
                 throw new \InvalidArgumentException(
-                    sprintf('Mixed JSON Schema is invalid: %s', $mixedSchemaPath)
+                    $this->trans('error.validation.mixin_invalid', ['%file%' => $mixedSchemaPath])
                 );
             }
 
@@ -91,7 +98,7 @@ final class JsonSchemaValidator
     private function resolveMixinPath(string $mixinPath, ?string $baseDirectory): string
     {
         if ($mixinPath === '') {
-            throw new \InvalidArgumentException('JSON Schema $mixin path must not be empty.');
+            throw new \InvalidArgumentException($this->trans('error.validation.mixin_path_empty'));
         }
 
         $resolvedPath = str_starts_with($mixinPath, '/') || str_starts_with($mixinPath, 'phar://')
@@ -100,7 +107,9 @@ final class JsonSchemaValidator
         $normalizedPath = $this->normalizePath($resolvedPath);
 
         if (!file_exists($normalizedPath)) {
-            throw new \InvalidArgumentException(sprintf('Mixed JSON Schema does not exist: %s', $normalizedPath));
+            throw new \InvalidArgumentException(
+                $this->trans('error.validation.mixin_not_found', ['%file%' => $normalizedPath])
+            );
         }
 
         return $normalizedPath;
@@ -156,7 +165,7 @@ final class JsonSchemaValidator
             || ($mixedSchema['$defs'] !== [] && array_is_list($mixedSchema['$defs']))
         ) {
             throw new \InvalidArgumentException(
-                sprintf('Mixed JSON Schema $defs must be an object: %s', $mixedSchemaPath)
+                $this->trans('error.validation.defs_object_mixed', ['%file%' => $mixedSchemaPath])
             );
         }
 
@@ -165,19 +174,19 @@ final class JsonSchemaValidator
         }
 
         if (!is_array($schema['$defs']) || ($schema['$defs'] !== [] && array_is_list($schema['$defs']))) {
-            throw new \InvalidArgumentException('JSON Schema $defs must be an object.');
+            throw new \InvalidArgumentException($this->trans('error.validation.defs_object'));
         }
 
         foreach ($mixedSchema['$defs'] as $name => $definition) {
             if (!is_string($name)) {
                 throw new \InvalidArgumentException(
-                    sprintf('Mixed JSON Schema $defs contains an invalid key: %s', $mixedSchemaPath)
+                    $this->trans('error.validation.defs_key_mixed', ['%file%' => $mixedSchemaPath])
                 );
             }
 
             if (isset($schema['$defs'][$name])) {
                 throw new \InvalidArgumentException(
-                    sprintf('Duplicate JSON Schema definition "%s" mixed from %s.', $name, $mixedSchemaPath)
+                    $this->trans('error.validation.defs_duplicate', ['%name%' => $name, '%file%' => $mixedSchemaPath])
                 );
             }
 
@@ -197,7 +206,7 @@ final class JsonSchemaValidator
     {
         if (isset($schema['$ref'])) {
             if (!is_string($schema['$ref'])) {
-                return [sprintf('%s has an invalid $ref.', $path)];
+                return [$this->trans('error.validation.ref_invalid', ['%path%' => $path])];
             }
 
             return $this->validateAgainstSchema(
@@ -217,14 +226,17 @@ final class JsonSchemaValidator
                 }
             }
 
-            return [sprintf('%s does not match any allowed schema.', $path)];
+            return [$this->trans('error.validation.any_of', ['%path%' => $path])];
         }
 
         $errors = [];
         if (isset($schema['type'])) {
             $types = is_array($schema['type']) ? $schema['type'] : [$schema['type']];
             if (!$this->matchesAnyType($value, $types)) {
-                $errors[] = sprintf('%s must be of type %s.', $path, implode('|', $types));
+                $errors[] = $this->trans('error.validation.type', [
+                    '%path%' => $path,
+                    '%type%' => implode('|', $types),
+                ]);
                 return $errors;
             }
         }
@@ -233,7 +245,7 @@ final class JsonSchemaValidator
             && is_array($schema['enum'])
             && !in_array($value, $schema['enum'], true)
         ) {
-            $errors[] = sprintf('%s must be one of the allowed values.', $path);
+            $errors[] = $this->trans('error.validation.enum', ['%path%' => $path]);
         }
 
         if (is_array($value) && ($value === [] || !array_is_list($value))) {
@@ -265,7 +277,7 @@ final class JsonSchemaValidator
 
         foreach ($value as $property => $propertyValue) {
             if (!is_string($property)) {
-                $errors[] = sprintf('%s contains an invalid property name.', $path);
+                $errors[] = $this->trans('error.validation.property_name', ['%path%' => $path]);
                 continue;
             }
 
@@ -283,7 +295,10 @@ final class JsonSchemaValidator
             }
 
             if (($schema['$include'] ?? true) === false) {
-                $errors[] = sprintf('%s.%s is not an allowed property.', $path, $property);
+                $errors[] = $this->trans('error.validation.property_not_allowed', [
+                    '%path%' => $path,
+                    '%property%' => $property,
+                ]);
                 continue;
             }
 
@@ -321,7 +336,10 @@ final class JsonSchemaValidator
             if ($type === 'integer' && is_int($value)) {
                 return true;
             }
-            if ($type === 'number' && (is_int($value) || is_float($value))) {
+            if ($type === 'float' && is_float($value)) {
+                return true;
+            }
+            if ($type === 'numeric-string' && is_string($value) && is_numeric($value)) {
                 return true;
             }
             if ($type === 'boolean' && is_bool($value)) {
@@ -335,6 +353,19 @@ final class JsonSchemaValidator
         return false;
     }
 
+
+    /**
+     * @param array<string, string> $parameters
+     */
+    private function trans(string $key, array $parameters = []): string
+    {
+        if ($this->translator === null) {
+            return strtr($key, $parameters);
+        }
+
+        return (string) ($this->translator)($key, $parameters);
+    }
+
     /**
      * @param array<string, mixed> $rootSchema
      * @return array<string, mixed>
@@ -342,20 +373,20 @@ final class JsonSchemaValidator
     private function resolveRef(string $ref, array $rootSchema): array
     {
         if (!str_starts_with($ref, '#/')) {
-            throw new \InvalidArgumentException(sprintf('Only local JSON Schema references are supported: %s', $ref));
+            throw new \InvalidArgumentException($this->trans('error.validation.ref_local', ['%ref%' => $ref]));
         }
 
         $current = $rootSchema;
         foreach (explode('/', substr($ref, 2)) as $segment) {
             $segment = str_replace(['~1', '~0'], ['/', '~'], $segment);
             if (!is_array($current) || !isset($current[$segment])) {
-                throw new \InvalidArgumentException(sprintf('Unable to resolve JSON Schema reference: %s', $ref));
+                throw new \InvalidArgumentException($this->trans('error.validation.ref_resolve', ['%ref%' => $ref]));
             }
             $current = $current[$segment];
         }
 
         if (!is_array($current)) {
-            throw new \InvalidArgumentException(sprintf('JSON Schema reference does not point to an object: %s', $ref));
+            throw new \InvalidArgumentException($this->trans('error.validation.ref_object', ['%ref%' => $ref]));
         }
 
         return $current;

@@ -2,17 +2,33 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Общие определения JSON Schema для консольных команд",
   "$defs": {
-    "stringOrNull": {
+    "string?": {
       "type": [
         "string",
         "null"
       ]
     },
-    "scalarOrNull": {
+    "numeric-string": {
+      "type": "numeric-string"
+    },
+    "numeric": {
+      "type": [
+        "integer",
+        "numeric-string"
+      ]
+    },
+    "numeric?": {
+      "type": [
+        "integer",
+        "numeric-string",
+        "null"
+      ]
+    },
+    "scalar?": {
       "type": [
         "string",
         "integer",
-        "number",
+        "float",
         "boolean",
         "null"
       ]
@@ -26,7 +42,10 @@
           "type": "boolean"
         },
         {
-          "type": "number"
+          "type": "integer"
+        },
+        {
+          "type": "float"
         },
         {
           "type": "string"

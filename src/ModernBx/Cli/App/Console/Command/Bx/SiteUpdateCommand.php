@@ -137,7 +137,7 @@ class SiteUpdateCommand extends KernelCommand
         $schema = $this->loadFieldsSchema($schemaPath);
 
         try {
-            $errors = (new JsonSchemaValidator())->validate($fields, $schema, $schemaPath);
+            $errors = (new JsonSchemaValidator([$this, 'trans']))->validate($fields, $schema, $schemaPath);
         } catch (\InvalidArgumentException $exception) {
             throw new \Exception(
                 $this->trans("error.site.update_schema_invalid", ["%message%" => $exception->getMessage()]),

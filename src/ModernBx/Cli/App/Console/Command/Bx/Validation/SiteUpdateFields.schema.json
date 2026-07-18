@@ -9,58 +9,58 @@
   "$include": false,
   "properties": {
     "LID": {
-      "$ref": "#/$defs/stringOrNull"
+      "$ref": "#/$defs/string?"
     },
     "SORT": {
-      "$ref": "#/$defs/scalarOrNull"
+      "$ref": "#/$defs/numeric"
     },
     "DEF": {
-      "$ref": "#/$defs/stringOrNull"
+      "$ref": "#/$defs/string?"
     },
     "ACTIVE": {
-      "$ref": "#/$defs/stringOrNull"
+      "$ref": "#/$defs/string?"
     },
     "NAME": {
-      "$ref": "#/$defs/stringOrNull"
+      "$ref": "#/$defs/string?"
     },
     "DIR": {
-      "$ref": "#/$defs/stringOrNull"
+      "$ref": "#/$defs/string?"
     },
     "FORMAT_DATE": {
-      "$ref": "#/$defs/stringOrNull"
+      "$ref": "#/$defs/string?"
     },
     "FORMAT_DATETIME": {
-      "$ref": "#/$defs/stringOrNull"
+      "$ref": "#/$defs/string?"
     },
     "FORMAT_NAME": {
-      "$ref": "#/$defs/stringOrNull"
+      "$ref": "#/$defs/string?"
     },
     "WEEK_START": {
-      "$ref": "#/$defs/scalarOrNull"
+      "$ref": "#/$defs/numeric?"
     },
     "CHARSET": {
-      "$ref": "#/$defs/stringOrNull"
+      "$ref": "#/$defs/string?"
     },
     "LANGUAGE_ID": {
-      "$ref": "#/$defs/stringOrNull"
+      "$ref": "#/$defs/string?"
     },
     "DOC_ROOT": {
-      "$ref": "#/$defs/stringOrNull"
+      "$ref": "#/$defs/string?"
     },
     "DOMAIN_LIMITED": {
-      "$ref": "#/$defs/stringOrNull"
+      "$ref": "#/$defs/string?"
     },
     "SERVER_NAME": {
-      "$ref": "#/$defs/stringOrNull"
+      "$ref": "#/$defs/string?"
     },
     "SITE_NAME": {
-      "$ref": "#/$defs/stringOrNull"
+      "$ref": "#/$defs/string?"
     },
     "EMAIL": {
-      "$ref": "#/$defs/stringOrNull"
+      "$ref": "#/$defs/string?"
     },
     "CULTURE_ID": {
-      "$ref": "#/$defs/scalarOrNull"
+      "$ref": "#/$defs/numeric?"
     }
   }
 }

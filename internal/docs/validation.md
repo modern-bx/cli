@@ -24,7 +24,7 @@
   "$include": false,
   "properties": {
     "NAME": {
-      "$ref": "#/$defs/stringOrNull"
+      "$ref": "#/$defs/string?"
     }
   }
 }
@@ -68,35 +68,63 @@
 Общие типы хранятся в `src/ModernBx/Cli/App/Console/Command/Validation/Global.schema.json`.
 Сейчас доступны следующие определения:
 
-### `stringOrNull`
+### `string?`
 
 Строка или `null`.
 
 ```json
 {
-  "$ref": "#/$defs/stringOrNull"
+  "$ref": "#/$defs/string?"
 }
 ```
 
 Используется для полей Bitrix, которые обычно передаются строками, но могут быть
 обнулены.
 
-### `scalarOrNull`
+### `numeric-string`
 
-Строка, целое число, число с плавающей точкой, boolean или `null`.
+Строка, которую PHP считает числовой через `is_numeric()`.
 
 ```json
 {
-  "$ref": "#/$defs/scalarOrNull"
+  "$ref": "#/$defs/numeric-string"
 }
 ```
 
-Подходит для полей, которые Bitrix может принять как скалярное значение, например
-числовые сортировки или идентификаторы.
+### `numeric`
+
+Целое число или `numeric-string`. Тип намеренно не принимает boolean и `float`.
+
+```json
+{
+  "$ref": "#/$defs/numeric"
+}
+```
+
+### `numeric?`
+
+`numeric` или `null`. Суффикс `?` в идентификаторах общих типов означает, что
+значение можно обнулить.
+
+```json
+{
+  "$ref": "#/$defs/numeric?"
+}
+```
+
+### `scalar?`
+
+Строка, целое число, `float`, boolean или `null`.
+
+```json
+{
+  "$ref": "#/$defs/scalar?"
+}
+```
 
 ### `jsonValue`
 
-Рекурсивное JSON-значение: `null`, boolean, number, string, массив JSON-значений
+Рекурсивное JSON-значение: `null`, boolean, integer, float, string, массив JSON-значений
 или объект, у которого каждое дополнительное поле тоже является `jsonValue`.
 
 ```json
@@ -150,7 +178,8 @@
 - `array` — JSON-массив;
 - `string` — строка;
 - `integer` — целое число;
-- `number` — целое число или число с плавающей точкой;
+- `float` — число с плавающей точкой;
+- `numeric-string` — числовая строка;
 - `boolean` — boolean;
 - `null` — `null`.
 
