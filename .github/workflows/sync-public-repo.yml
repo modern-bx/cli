@@ -1,0 +1,61 @@
+name: Sync master to public repository
+
+on:
+  push:
+    branches:
+      - master
+
+permissions:
+  contents: read
+
+jobs:
+  sync:
+    name: Push master to PUBLIC_REPO
+    runs-on: ubuntu-latest
+    if: ${{ vars.PUBLIC_REPO != '' }}
+
+    steps:
+      - name: Check sync target
+        id: target
+        env:
+          PUBLIC_REPO: ${{ vars.PUBLIC_REPO }}
+        run: |
+          if ! [[ "${PUBLIC_REPO}" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]]; then
+            echo "PUBLIC_REPO must be set to owner/repository." >&2
+            exit 1
+          fi
+
+          if [ "${GITHUB_REPOSITORY,,}" = "${PUBLIC_REPO,,}" ]; then
+            echo "This repository is PUBLIC_REPO; skipping sync."
+            echo "sync=false" >> "${GITHUB_OUTPUT}"
+          else
+            echo "sync=true" >> "${GITHUB_OUTPUT}"
+          fi
+
+      - name: Checkout repository
+        if: ${{ steps.target.outputs.sync == 'true' }}
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate sync token
+        if: ${{ steps.target.outputs.sync == 'true' }}
+        env:
+          PUBLIC_REPO: ${{ vars.PUBLIC_REPO }}
+          PUBLIC_REPO_TOKEN: ${{ secrets.PUBLIC_REPO_TOKEN }}
+        run: |
+          if [ -z "${PUBLIC_REPO_TOKEN}" ]; then
+            echo "PUBLIC_REPO_TOKEN secret is required to push to ${PUBLIC_REPO}." >&2
+            exit 1
+          fi
+
+      - name: Push master to public repository
+        if: ${{ steps.target.outputs.sync == 'true' }}
+        env:
+          PUBLIC_REPO: ${{ vars.PUBLIC_REPO }}
+          PUBLIC_REPO_TOKEN: ${{ secrets.PUBLIC_REPO_TOKEN }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git remote add public "https://x-access-token:${PUBLIC_REPO_TOKEN}@github.com/${PUBLIC_REPO}.git"
+          git push --force public "HEAD:refs/heads/master"
