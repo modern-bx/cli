@@ -7,6 +7,7 @@ declare(strict_types=1);
 namespace ModernBx\Cli\App\Console\Command\Bx;
 
 use ModernBx\Cli\App\Console\Mixin\Common\IO;
+use ModernBx\Cli\App\Validation\JsonSchemaValidator;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputDefinition;
 use Symfony\Component\Console\Input\InputInterface;
@@ -34,9 +35,9 @@ class SiteUpdateCommand extends KernelCommand
                         $this->trans("argument.site.lid"),
                     ),
                     new InputArgument(
-                        'values',
+                        'fields',
                         InputArgument::REQUIRED,
-                        $this->trans("argument.site.update_values"),
+                        $this->trans("argument.site.update_fields"),
                     ),
                 ]),
             );
@@ -53,22 +54,23 @@ class SiteUpdateCommand extends KernelCommand
         parent::executeInternal($input, $output);
 
         $lid = $input->getArgument("LID");
-        $values = $input->getArgument("values");
+        $fields = $input->getArgument("fields");
 
         if (!is_string($lid)) {
             throw new \Exception($this->trans("error.site.lid_string"), static::CODE_INVALID_ARGUMENT_VALUE);
         }
 
-        if (!is_string($values)) {
+        if (!is_string($fields)) {
             throw new \Exception($this->trans("error.site.update_json_string"), static::CODE_INVALID_ARGUMENT_VALUE);
         }
 
-        /** @var array<string, mixed> $decodedValues */
-        $decodedValues = $this->decodeValues($values);
+        /** @var array<string, mixed> $decodedFields */
+        $decodedFields = $this->decodeFields($fields);
+        $this->validateFields($decodedFields);
 
         /** @noinspection PhpUndefinedClassInspection */
         /** @phpstan-ignore-next-line */
-        $result = \Bitrix\Main\SiteTable::update($lid, $decodedValues);
+        $result = \Bitrix\Main\SiteTable::update($lid, $decodedFields);
 
         if (!$result->isSuccess()) {
             throw new \Exception(implode(PHP_EOL, $result->getErrorMessages()), static::CODE_INVALID_ARGUMENT_VALUE);
@@ -76,13 +78,13 @@ class SiteUpdateCommand extends KernelCommand
     }
 
     /**
-     * @param string $values
+     * @param string $fields
      * @return array<string, mixed>
      * @throws \Exception
      */
-    private function decodeValues(string $values): array
+    private function decodeFields(string $fields): array
     {
-        $decoded = json_decode($values, true);
+        $decoded = json_decode($fields);
 
         if (json_last_error() !== JSON_ERROR_NONE) {
             throw new \Exception(
@@ -91,11 +93,99 @@ class SiteUpdateCommand extends KernelCommand
             );
         }
 
-        if (!is_array($decoded) || array_is_list($decoded)) {
+        if (!$decoded instanceof \stdClass) {
             throw new \Exception($this->trans("error.site.update_object"), static::CODE_INVALID_ARGUMENT_VALUE);
         }
 
-        /** @var array<string, mixed> $decoded */
-        return $decoded;
+        return $this->jsonObjectToArray($decoded);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function jsonObjectToArray(\stdClass $object): array
+    {
+        $result = [];
+
+        foreach (get_object_vars($object) as $key => $value) {
+            $result[$key] = $this->jsonValueToArray($value);
+        }
+
+        return $result;
+    }
+
+    private function jsonValueToArray(mixed $value): mixed
+    {
+        if ($value instanceof \stdClass) {
+            return $this->jsonObjectToArray($value);
+        }
+
+        if (is_array($value)) {
+            return array_map([$this, 'jsonValueToArray'], $value);
+        }
+
+        return $value;
+    }
+
+    /**
+     * @param array<string, mixed> $fields
+     * @throws \Exception
+     */
+    private function validateFields(array $fields): void
+    {
+        $schemaPath = $this->getFieldsSchemaPath();
+        $schema = $this->loadFieldsSchema($schemaPath);
+
+        try {
+            $errors = (new JsonSchemaValidator(
+                fn (string $key, array $parameters = []): string => $this->trans($key, $parameters)
+            ))->validate($fields, $schema, $schemaPath);
+        } catch (\InvalidArgumentException $exception) {
+            throw new \Exception(
+                $this->trans("error.site.update_schema_invalid", ["%message%" => $exception->getMessage()]),
+                static::CODE_INVALID_ARGUMENT_VALUE,
+                $exception
+            );
+        }
+
+        if ($errors !== []) {
+            throw new \Exception(
+                $this->trans("error.site.update_schema", ["%message%" => implode(PHP_EOL, $errors)]),
+                static::CODE_INVALID_ARGUMENT_VALUE
+            );
+        }
+    }
+
+    /**
+     * @return array<string, mixed>
+     * @throws \Exception
+     */
+    private function loadFieldsSchema(string $schemaPath): array
+    {
+        $schemaJson = file_get_contents($schemaPath);
+
+        if ($schemaJson === false) {
+            throw new \Exception(
+                $this->trans("error.site.update_schema_read", ["%file%" => $schemaPath]),
+                static::CODE_INVALID_ARGUMENT_VALUE
+            );
+        }
+
+        $schema = json_decode($schemaJson, true);
+
+        if (json_last_error() !== JSON_ERROR_NONE || !is_array($schema) || array_is_list($schema)) {
+            throw new \Exception(
+                $this->trans("error.site.update_schema_invalid", ["%message%" => json_last_error_msg()]),
+                static::CODE_INVALID_ARGUMENT_VALUE
+            );
+        }
+
+        /** @var array<string, mixed> $schema */
+        return $schema;
+    }
+
+    private function getFieldsSchemaPath(): string
+    {
+        return __DIR__ . '/Validation/SiteUpdateFields.schema.json';
     }
 }

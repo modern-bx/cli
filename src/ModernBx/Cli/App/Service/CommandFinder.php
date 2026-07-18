@@ -44,7 +44,10 @@ final class CommandFinder
     {
         $finder = Finder::create();
 
-        $finder->files()->in($_SERVER["DOCUMENT_ROOT"] . "/src/" . $this->namespace);
+        $finder
+            ->files()
+            ->name("*.php")
+            ->in($_SERVER["DOCUMENT_ROOT"] . "/src/" . $this->namespace);
 
         if ($finder->hasResults()) {
             foreach ($finder as $file) {

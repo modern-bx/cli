@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Общие определения JSON Schema для консольных команд",
+  "$defs": {
+    "string?": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "numeric-string": {
+      "type": "numeric-string"
+    },
+    "numeric": {
+      "type": [
+        "integer",
+        "numeric-string"
+      ]
+    },
+    "numeric?": {
+      "type": [
+        "integer",
+        "numeric-string",
+        "null"
+      ]
+    },
+    "scalar?": {
+      "type": [
+        "string",
+        "integer",
+        "float",
+        "boolean",
+        "null"
+      ]
+    },
+    "jsonValue": {
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "integer"
+        },
+        {
+          "type": "float"
+        },
+        {
+          "type": "string"
+        },
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/jsonValue"
+          }
+        },
+        {
+          "type": "object",
+          "$include": {
+            "$ref": "#/$defs/jsonValue"
+          }
+        }
+      ]
+    }
+  }
+}

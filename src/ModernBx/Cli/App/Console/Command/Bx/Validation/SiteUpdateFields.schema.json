@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Аргумент fields команды site:update",
+  "description": "Допустимые поля JSON-объекта для обновления таблицы Bitrix b_lang.",
+  "$mixin": [
+    "../../Validation/Global.schema.json"
+  ],
+  "type": "object",
+  "$include": false,
+  "properties": {
+    "LID": {
+      "$ref": "#/$defs/string?"
+    },
+    "SORT": {
+      "$ref": "#/$defs/numeric"
+    },
+    "DEF": {
+      "$ref": "#/$defs/string?"
+    },
+    "ACTIVE": {
+      "$ref": "#/$defs/string?"
+    },
+    "NAME": {
+      "$ref": "#/$defs/string?"
+    },
+    "DIR": {
+      "$ref": "#/$defs/string?"
+    },
+    "FORMAT_DATE": {
+      "$ref": "#/$defs/string?"
+    },
+    "FORMAT_DATETIME": {
+      "$ref": "#/$defs/string?"
+    },
+    "FORMAT_NAME": {
+      "$ref": "#/$defs/string?"
+    },
+    "WEEK_START": {
+      "$ref": "#/$defs/numeric?"
+    },
+    "CHARSET": {
+      "$ref": "#/$defs/string?"
+    },
+    "LANGUAGE_ID": {
+      "$ref": "#/$defs/string?"
+    },
+    "DOC_ROOT": {
+      "$ref": "#/$defs/string?"
+    },
+    "DOMAIN_LIMITED": {
+      "$ref": "#/$defs/string?"
+    },
+    "SERVER_NAME": {
+      "$ref": "#/$defs/string?"
+    },
+    "SITE_NAME": {
+      "$ref": "#/$defs/string?"
+    },
+    "EMAIL": {
+      "$ref": "#/$defs/string?"
+    },
+    "CULTURE_ID": {
+      "$ref": "#/$defs/numeric?"
+    }
+  }
+}
