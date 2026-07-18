@@ -37,6 +37,9 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          # Avoid persisting GITHUB_TOKEN credentials for github.com: the push
+          # below must authenticate with PUBLIC_REPO_TOKEN for the target repo.
+          persist-credentials: false
 
       - name: Validate sync token
         if: ${{ steps.target.outputs.sync == 'true' }}
