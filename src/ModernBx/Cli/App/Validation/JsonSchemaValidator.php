@@ -91,16 +91,51 @@ final class JsonSchemaValidator
             throw new \InvalidArgumentException('JSON Schema $mixin path must not be empty.');
         }
 
-        $resolvedPath = str_starts_with($mixinPath, '/')
+        $resolvedPath = str_starts_with($mixinPath, '/') || str_starts_with($mixinPath, 'phar://')
             ? $mixinPath
             : ($baseDirectory === null ? $mixinPath : $baseDirectory . '/' . $mixinPath);
-        $realPath = realpath($resolvedPath);
+        $normalizedPath = $this->normalizePath($resolvedPath);
 
-        if ($realPath === false) {
-            throw new \InvalidArgumentException(sprintf('Mixed JSON Schema does not exist: %s', $resolvedPath));
+        if (!file_exists($normalizedPath)) {
+            throw new \InvalidArgumentException(sprintf('Mixed JSON Schema does not exist: %s', $normalizedPath));
         }
 
-        return $realPath;
+        return $normalizedPath;
+    }
+
+    private function normalizePath(string $path): string
+    {
+        $prefix = '';
+        if (str_starts_with($path, 'phar://')) {
+            $prefix = 'phar://';
+            $path = substr($path, 7);
+        }
+
+        $isAbsolute = str_starts_with($path, '/');
+        $segments = [];
+
+        foreach (explode('/', $path) as $segment) {
+            if ($segment === '' || $segment === '.') {
+                continue;
+            }
+
+            if ($segment === '..') {
+                if ($segments !== [] && end($segments) !== '..') {
+                    array_pop($segments);
+                    continue;
+                }
+
+                if (!$isAbsolute) {
+                    $segments[] = $segment;
+                }
+
+                continue;
+            }
+
+            $segments[] = $segment;
+        }
+
+        return $prefix . ($isAbsolute ? '/' : '') . implode('/', $segments);
     }
 
     /**
