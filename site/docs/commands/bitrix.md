@@ -116,7 +116,7 @@ php cli.phar site:get s1
 php cli.phar site:get --select='["LID","NAME","DIR"]' s1
 ```
 
-## `site:update <LID> <values-json>`
+## `site:update <LID> <fields-json>`
 
 Обновляет поля сайта через `SiteTable::update`. Второй аргумент должен быть JSON-объектом.
 

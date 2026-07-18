@@ -35,9 +35,9 @@ class SiteUpdateCommand extends KernelCommand
                         $this->trans("argument.site.lid"),
                     ),
                     new InputArgument(
-                        'values',
+                        'fields',
                         InputArgument::REQUIRED,
-                        $this->trans("argument.site.update_values"),
+                        $this->trans("argument.site.update_fields"),
                     ),
                 ]),
             );
@@ -54,23 +54,23 @@ class SiteUpdateCommand extends KernelCommand
         parent::executeInternal($input, $output);
 
         $lid = $input->getArgument("LID");
-        $values = $input->getArgument("values");
+        $fields = $input->getArgument("fields");
 
         if (!is_string($lid)) {
             throw new \Exception($this->trans("error.site.lid_string"), static::CODE_INVALID_ARGUMENT_VALUE);
         }
 
-        if (!is_string($values)) {
+        if (!is_string($fields)) {
             throw new \Exception($this->trans("error.site.update_json_string"), static::CODE_INVALID_ARGUMENT_VALUE);
         }
 
-        /** @var array<string, mixed> $decodedValues */
-        $decodedValues = $this->decodeValues($values);
-        $this->validateValues($decodedValues);
+        /** @var array<string, mixed> $decodedFields */
+        $decodedFields = $this->decodeFields($fields);
+        $this->validateFields($decodedFields);
 
         /** @noinspection PhpUndefinedClassInspection */
         /** @phpstan-ignore-next-line */
-        $result = \Bitrix\Main\SiteTable::update($lid, $decodedValues);
+        $result = \Bitrix\Main\SiteTable::update($lid, $decodedFields);
 
         if (!$result->isSuccess()) {
             throw new \Exception(implode(PHP_EOL, $result->getErrorMessages()), static::CODE_INVALID_ARGUMENT_VALUE);
@@ -78,13 +78,13 @@ class SiteUpdateCommand extends KernelCommand
     }
 
     /**
-     * @param string $values
+     * @param string $fields
      * @return array<string, mixed>
      * @throws \Exception
      */
-    private function decodeValues(string $values): array
+    private function decodeFields(string $fields): array
     {
-        $decoded = json_decode($values, true);
+        $decoded = json_decode($fields, true);
 
         if (json_last_error() !== JSON_ERROR_NONE) {
             throw new \Exception(
@@ -102,16 +102,16 @@ class SiteUpdateCommand extends KernelCommand
     }
 
     /**
-     * @param array<string, mixed> $values
+     * @param array<string, mixed> $fields
      * @throws \Exception
      */
-    private function validateValues(array $values): void
+    private function validateFields(array $fields): void
     {
-        $schemaPath = $this->getValuesSchemaPath();
-        $schema = $this->loadValuesSchema($schemaPath);
+        $schemaPath = $this->getFieldsSchemaPath();
+        $schema = $this->loadFieldsSchema($schemaPath);
 
         try {
-            $errors = (new JsonSchemaValidator())->validate($values, $schema, $schemaPath);
+            $errors = (new JsonSchemaValidator())->validate($fields, $schema, $schemaPath);
         } catch (\InvalidArgumentException $exception) {
             throw new \Exception(
                 $this->trans("error.site.update_schema_invalid", ["%message%" => $exception->getMessage()]),
@@ -132,7 +132,7 @@ class SiteUpdateCommand extends KernelCommand
      * @return array<string, mixed>
      * @throws \Exception
      */
-    private function loadValuesSchema(string $schemaPath): array
+    private function loadFieldsSchema(string $schemaPath): array
     {
         $schemaJson = file_get_contents($schemaPath);
 
@@ -156,8 +156,8 @@ class SiteUpdateCommand extends KernelCommand
         return $schema;
     }
 
-    private function getValuesSchemaPath(): string
+    private function getFieldsSchemaPath(): string
     {
-        return __DIR__ . '/Validation/SiteUpdateValues.schema.json';
+        return __DIR__ . '/Validation/SiteUpdateFields.schema.json';
     }
 }
