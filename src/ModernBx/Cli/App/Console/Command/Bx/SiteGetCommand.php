@@ -11,6 +11,7 @@ use ModernBx\Cli\App\Service\ClassAliasLoader;
 use ModernBx\Cli\App\Service\Remote\BitrixAdminClient;
 use ModernBx\Cli\App\Service\Remote\RemoteProjectConfigManager;
 use ModernBx\Cli\App\Service\Remote\RemotePhpTrait;
+use ModernBx\Cli\App\Service\Remote\RemoteSitePhpCodeBuilder;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputDefinition;
 use Symfony\Component\Console\Input\InputInterface;
@@ -24,15 +25,19 @@ class SiteGetCommand extends KernelCommand
     use IO;
     use RemotePhpTrait;
 
+    private RemoteSitePhpCodeBuilder $remoteSitePhpCodeBuilder;
+
     public function __construct(
         ClassAliasLoader $aliasLoader,
         RemoteProjectConfigManager $remoteProjectConfigManager,
-        BitrixAdminClient $bitrixAdminClient
+        BitrixAdminClient $bitrixAdminClient,
+        RemoteSitePhpCodeBuilder $remoteSitePhpCodeBuilder
     ) {
         parent::__construct($aliasLoader);
 
         $this->remoteProjectConfigManager = $remoteProjectConfigManager;
         $this->bitrixAdminClient = $bitrixAdminClient;
+        $this->remoteSitePhpCodeBuilder = $remoteSitePhpCodeBuilder;
     }
 
     /**
@@ -169,7 +174,7 @@ class SiteGetCommand extends KernelCommand
         }
 
         $line = $this->decodeRemoteJsonResult(
-            $this->executeRemotePhp($remote, $this->buildRemoteSiteCode('get', ['query' => $query, 'flags' => $flags])),
+            $this->executeRemotePhp($remote, $this->remoteSitePhpCodeBuilder->buildGet($query, $flags)),
             'Не удалось получить сайт удаленного проекта.',
         );
 

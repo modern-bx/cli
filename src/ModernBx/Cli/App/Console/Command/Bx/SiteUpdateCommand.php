@@ -11,6 +11,7 @@ use ModernBx\Cli\App\Service\ClassAliasLoader;
 use ModernBx\Cli\App\Service\Remote\BitrixAdminClient;
 use ModernBx\Cli\App\Service\Remote\RemoteProjectConfigManager;
 use ModernBx\Cli\App\Service\Remote\RemotePhpTrait;
+use ModernBx\Cli\App\Service\Remote\RemoteSitePhpCodeBuilder;
 use ModernBx\Cli\App\Validation\JsonSchemaValidator;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputDefinition;
@@ -23,15 +24,19 @@ class SiteUpdateCommand extends KernelCommand
     use IO;
     use RemotePhpTrait;
 
+    private RemoteSitePhpCodeBuilder $remoteSitePhpCodeBuilder;
+
     public function __construct(
         ClassAliasLoader $aliasLoader,
         RemoteProjectConfigManager $remoteProjectConfigManager,
-        BitrixAdminClient $bitrixAdminClient
+        BitrixAdminClient $bitrixAdminClient,
+        RemoteSitePhpCodeBuilder $remoteSitePhpCodeBuilder
     ) {
         parent::__construct($aliasLoader);
 
         $this->remoteProjectConfigManager = $remoteProjectConfigManager;
         $this->bitrixAdminClient = $bitrixAdminClient;
+        $this->remoteSitePhpCodeBuilder = $remoteSitePhpCodeBuilder;
     }
 
     /**
@@ -133,7 +138,7 @@ class SiteUpdateCommand extends KernelCommand
         $this->decodeRemoteJsonResult(
             $this->executeRemotePhp(
                 $remote,
-                $this->buildRemoteSiteCode('update', ['lid' => $lid, 'fields' => $decodedFields]),
+                $this->remoteSitePhpCodeBuilder->buildUpdate($lid, $decodedFields),
             ),
             'Не удалось обновить сайт удаленного проекта.',
         );

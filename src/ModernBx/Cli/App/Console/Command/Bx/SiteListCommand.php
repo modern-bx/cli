@@ -11,6 +11,7 @@ use ModernBx\Cli\App\Service\ClassAliasLoader;
 use ModernBx\Cli\App\Service\Remote\BitrixAdminClient;
 use ModernBx\Cli\App\Service\Remote\RemoteProjectConfigManager;
 use ModernBx\Cli\App\Service\Remote\RemotePhpTrait;
+use ModernBx\Cli\App\Service\Remote\RemoteSitePhpCodeBuilder;
 use Symfony\Component\Console\Input\InputDefinition;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
@@ -23,15 +24,19 @@ class SiteListCommand extends KernelCommand
     use IO;
     use RemotePhpTrait;
 
+    private RemoteSitePhpCodeBuilder $remoteSitePhpCodeBuilder;
+
     public function __construct(
         ClassAliasLoader $aliasLoader,
         RemoteProjectConfigManager $remoteProjectConfigManager,
-        BitrixAdminClient $bitrixAdminClient
+        BitrixAdminClient $bitrixAdminClient,
+        RemoteSitePhpCodeBuilder $remoteSitePhpCodeBuilder
     ) {
         parent::__construct($aliasLoader);
 
         $this->remoteProjectConfigManager = $remoteProjectConfigManager;
         $this->bitrixAdminClient = $bitrixAdminClient;
+        $this->remoteSitePhpCodeBuilder = $remoteSitePhpCodeBuilder;
     }
 
     /**
@@ -165,7 +170,7 @@ class SiteListCommand extends KernelCommand
         }
 
         $result = $this->decodeRemoteJsonResult(
-            $this->executeRemotePhp($remote, $this->buildRemoteListCode($query, $flags)),
+            $this->executeRemotePhp($remote, $this->remoteSitePhpCodeBuilder->buildList($query, $flags)),
             'Не удалось получить список сайтов удаленного проекта.',
         );
 
@@ -178,11 +183,6 @@ class SiteListCommand extends KernelCommand
         }
     }
 
-    /** @param array<string, mixed> $query */
-    protected function buildRemoteListCode(array $query, int $flags): string
-    {
-        return $this->buildRemoteSiteCode('list', ['query' => $query, 'flags' => $flags]);
-    }
 
     /**
      * @param string $option
