@@ -20,11 +20,11 @@ composer build
 ## Сборка с выбранными бандлами
 
 ```bash
-composer configure -- --bundle Bx Db File Remote
+composer configure -- --bundle Core Bx
 composer build
 ```
 
-Бандл соответствует подпространству имён внутри `ModernBx/Cli/App/Console/Command`. Например, `Bx` включает команды Bitrix, `Db` — команды базы данных. Если в нескольких бандлах есть команды с одинаковым именем, такие бандлы конфликтуют.
+Бандл соответствует подпространству имён внутри `ModernBx/Cli/App/Console/Command`. После реорганизации основных неймспейсов используйте верхнеуровневые бандлы `Core` и `Bx`: `Core` включает системные утилиты (`remote:*`, `session:remote`, `json:*`, `env:*`, `completion:bash`), а `Bx` — команды Bitrix-проекта (`cache:*`, `module:*`, `option:*`, `setting:*`, `site:*`, `db:*`, `file:*`, `php:exec`, `backup:*`). Если в нескольких бандлах есть команды с одинаковым именем, такие бандлы конфликтуют.
 
 ## Документация VitePress
 
