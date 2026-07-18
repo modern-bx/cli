@@ -38,6 +38,20 @@
 
 PHAR появится в `./dist`.
 
+## Bash autocompletion
+
+Если PHAR установлен как `~/.local/bin/bx-cli` и имеет права на выполнение, сгенерируйте completion-скрипт и подключите его в текущей оболочке:
+
+```bash
+mkdir -p ~/.local/share/bash-completion/completions
+bx-cli completion:bash bx-cli > ~/.local/share/bash-completion/completions/bx-cli
+source ~/.local/share/bash-completion/completions/bx-cli
+```
+
+После перезапуска bash completion подхватится автоматически, если пакет `bash-completion` установлен и подключается вашими shell-настройками.
+
+Если PHAR доступен под другим именем, передайте это имя аргументом команды `completion:bash` и сохраните файл completion под тем же именем.
+
 ## Кастомизация
 
 Система сборки позволяет собирать cli.phar только с теми наборами команд, который необходимы для конкретного проекта.
