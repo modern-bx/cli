@@ -1,6 +1,15 @@
 # Команды Bitrix
 
-Все команды этого раздела рассчитаны на запуск изнутри Bitrix-проекта. CLI ищет каталог `bitrix` вверх от текущей директории и подключает ядро перед выполнением бизнес-логики.
+Большинство команд этого раздела рассчитаны на запуск изнутри Bitrix-проекта: CLI ищет каталог `bitrix` вверх от текущей директории и подключает ядро перед выполнением бизнес-логики. Исключение — `backup:extract`: она работает с переданным архивом напрямую и не требует document root.
+
+## `backup:extract [--password=<password>] <archive> <destination>`
+
+Распаковывает архив резервной копии Bitrix в указанный каталог. Команда не подключает ядро проекта и описана отдельно в разделе [Резервные копии](./backup.md).
+
+```bash
+php cli.phar backup:extract ./backup.tar.gz ./restore
+php cli.phar backup:extract --password='secret' ./backup.enc.gz ./restore
+```
 
 ## `cache:clear [directory...]`
 
