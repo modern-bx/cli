@@ -47,6 +47,10 @@ jobs:
       - name: Configure PHAR build
         run: composer run configure
 
+      - name: Set PHAR build version
+        run: |
+          php -r '$config = json_decode(file_get_contents("box.json"), true); unset($config["git"]); $config["replacements"]["build-version"] = getenv("GITHUB_SHA"); file_put_contents("box.json", json_encode($config, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));'
+
       - name: Build PHAR
         run: composer run build
 
