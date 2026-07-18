@@ -90,6 +90,9 @@ return [
     'error.site.update_json_string' => 'Update values must be a JSON object string.',
     'error.site.update_invalid_json' => 'Update values contain invalid JSON: %message%',
     'error.site.update_object' => 'Update values must be a JSON object.',
+    'error.site.update_schema' => 'Update values do not match the schema: %message%',
+    'error.site.update_schema_read' => 'Unable to read update values schema: %file%',
+    'error.site.update_schema_invalid' => 'Update values schema contains invalid JSON: %message%',
 
     'command.php_exec.description' => 'Execute PHP code in Bitrix context',
     'command.php_exec.help' => 'Reads PHP code from stdin and executes it after loading the Bitrix kernel.',

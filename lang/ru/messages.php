@@ -92,6 +92,9 @@ return [
     'error.site.update_json_string' => 'Значения обновления должны быть JSON-строкой объекта.',
     'error.site.update_invalid_json' => 'Значения обновления содержат некорректный JSON: %message%',
     'error.site.update_object' => 'Значения обновления должны быть JSON-объектом.',
+    'error.site.update_schema' => 'Значения обновления не соответствуют схеме: %message%',
+    'error.site.update_schema_read' => 'Не удалось прочитать схему значений обновления: %file%',
+    'error.site.update_schema_invalid' => 'Схема значений обновления содержит некорректный JSON: %message%',
 
     'command.php_exec.description' => 'Выполнить PHP-код в контексте Bitrix',
     'command.php_exec.help' => 'Читает PHP-код из stdin и выполняет его после подключения ядра Bitrix.',

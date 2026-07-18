@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://modern-bx.local/schemas/console/command/bx/site-update-values.schema.json",
+  "title": "site:update values argument",
+  "description": "Allowed JSON object fields for Bitrix b_lang table updates.",
+  "$include": ["../../Validation/Global.schema.json"],
+  "type": "object",
+  "additionalProperties": false,
+  "minProperties": 1,
+  "properties": {
+    "LID": { "$ref": "#/$defs/stringOrNull" },
+    "SORT": { "$ref": "#/$defs/scalarOrNull" },
+    "DEF": { "$ref": "#/$defs/stringOrNull" },
+    "ACTIVE": { "$ref": "#/$defs/stringOrNull" },
+    "NAME": { "$ref": "#/$defs/stringOrNull" },
+    "DIR": { "$ref": "#/$defs/stringOrNull" },
+    "FORMAT_DATE": { "$ref": "#/$defs/stringOrNull" },
+    "FORMAT_DATETIME": { "$ref": "#/$defs/stringOrNull" },
+    "FORMAT_NAME": { "$ref": "#/$defs/stringOrNull" },
+    "WEEK_START": { "$ref": "#/$defs/scalarOrNull" },
+    "CHARSET": { "$ref": "#/$defs/stringOrNull" },
+    "LANGUAGE_ID": { "$ref": "#/$defs/stringOrNull" },
+    "DOC_ROOT": { "$ref": "#/$defs/stringOrNull" },
+    "DOMAIN_LIMITED": { "$ref": "#/$defs/stringOrNull" },
+    "SERVER_NAME": { "$ref": "#/$defs/stringOrNull" },
+    "SITE_NAME": { "$ref": "#/$defs/stringOrNull" },
+    "EMAIL": { "$ref": "#/$defs/stringOrNull" },
+    "CULTURE_ID": { "$ref": "#/$defs/scalarOrNull" }
+  }
+}

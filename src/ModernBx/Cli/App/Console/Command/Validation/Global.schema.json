@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://modern-bx.local/schemas/console/command/global.schema.json",
+  "title": "Global command JSON Schema definitions",
+  "$defs": {
+    "stringOrNull": {
+      "type": ["string", "null"]
+    },
+    "scalarOrNull": {
+      "type": ["string", "integer", "number", "boolean", "null"]
+    },
+    "jsonValue": {
+      "anyOf": [
+        { "type": "null" },
+        { "type": "boolean" },
+        { "type": "number" },
+        { "type": "string" },
+        {
+          "type": "array",
+          "items": { "$ref": "#/$defs/jsonValue" }
+        },
+        {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/jsonValue" }
+        }
+      ]
+    }
+  }
+}

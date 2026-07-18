@@ -7,6 +7,7 @@ declare(strict_types=1);
 namespace ModernBx\Cli\App\Console\Command\Bx;
 
 use ModernBx\Cli\App\Console\Mixin\Common\IO;
+use ModernBx\Cli\App\Validation\JsonSchemaValidator;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputDefinition;
 use Symfony\Component\Console\Input\InputInterface;
@@ -65,6 +66,7 @@ class SiteUpdateCommand extends KernelCommand
 
         /** @var array<string, mixed> $decodedValues */
         $decodedValues = $this->decodeValues($values);
+        $this->validateValues($decodedValues);
 
         /** @noinspection PhpUndefinedClassInspection */
         /** @phpstan-ignore-next-line */
@@ -97,5 +99,65 @@ class SiteUpdateCommand extends KernelCommand
 
         /** @var array<string, mixed> $decoded */
         return $decoded;
+    }
+
+    /**
+     * @param array<string, mixed> $values
+     * @throws \Exception
+     */
+    private function validateValues(array $values): void
+    {
+        $schemaPath = $this->getValuesSchemaPath();
+        $schema = $this->loadValuesSchema($schemaPath);
+
+        try {
+            $errors = (new JsonSchemaValidator())->validate($values, $schema, $schemaPath);
+        } catch (\InvalidArgumentException $exception) {
+            throw new \Exception(
+                $this->trans("error.site.update_schema_invalid", ["%message%" => $exception->getMessage()]),
+                static::CODE_INVALID_ARGUMENT_VALUE,
+                $exception
+            );
+        }
+
+        if ($errors !== []) {
+            throw new \Exception(
+                $this->trans("error.site.update_schema", ["%message%" => implode(PHP_EOL, $errors)]),
+                static::CODE_INVALID_ARGUMENT_VALUE
+            );
+        }
+    }
+
+    /**
+     * @return array<string, mixed>
+     * @throws \Exception
+     */
+    private function loadValuesSchema(string $schemaPath): array
+    {
+        $schemaJson = file_get_contents($schemaPath);
+
+        if ($schemaJson === false) {
+            throw new \Exception(
+                $this->trans("error.site.update_schema_read", ["%file%" => $schemaPath]),
+                static::CODE_INVALID_ARGUMENT_VALUE
+            );
+        }
+
+        $schema = json_decode($schemaJson, true);
+
+        if (json_last_error() !== JSON_ERROR_NONE || !is_array($schema) || array_is_list($schema)) {
+            throw new \Exception(
+                $this->trans("error.site.update_schema_invalid", ["%message%" => json_last_error_msg()]),
+                static::CODE_INVALID_ARGUMENT_VALUE
+            );
+        }
+
+        /** @var array<string, mixed> $schema */
+        return $schema;
+    }
+
+    private function getValuesSchemaPath(): string
+    {
+        return __DIR__ . '/Validation/SiteUpdateValues.schema.json';
     }
 }
