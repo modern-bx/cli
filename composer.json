@@ -44,7 +44,8 @@
     "require-dev": {
         "squizlabs/php_codesniffer": "^3.5.6",
         "phpstan/phpstan": "^1.12.25",
-        "phpro/grumphp": "^1.0"
+        "phpro/grumphp": "^1.0",
+        "phpunit/phpunit": "^9.6"
     },
     "scripts": {
         "grumphp": "grumphp run",
@@ -52,5 +53,10 @@
         "analyze": "phpstan analyse src",
         "configure": "php bin/compiler.php phar:configure",
         "build": "tools/box compile -v && php bin/compiler.php phar:clean"
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "ModernBx\\Cli\\Tests\\": "tests/"
+        }
     }
 }
