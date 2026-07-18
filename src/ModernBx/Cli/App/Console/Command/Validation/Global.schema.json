@@ -39,7 +39,7 @@
         },
         {
           "type": "object",
-          "additionalProperties": {
+          "$include": {
             "$ref": "#/$defs/jsonValue"
           }
         }

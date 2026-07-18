@@ -2,12 +2,11 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Аргумент fields команды site:update",
   "description": "Допустимые поля JSON-объекта для обновления таблицы Bitrix b_lang.",
-  "$include": [
+  "$mixin": [
     "../../Validation/Global.schema.json"
   ],
   "type": "object",
-  "additionalProperties": false,
-  "minProperties": 1,
+  "$include": false,
   "properties": {
     "LID": {
       "$ref": "#/$defs/stringOrNull"

@@ -7,8 +7,8 @@ namespace ModernBx\Cli\App\Validation;
 /**
  * Lightweight validator for the JSON Schema keywords used by command argument schemas.
  *
- * The schema files stay in the standard JSON Schema format, so they can be read by humans
- * and by full-featured validators if deeper validation rules are needed later.
+ * The schema files stay close to JSON Schema while adding project-specific $mixin
+ * and $include keys for reusable definitions and open object fields.
  */
 final class JsonSchemaValidator
 {
@@ -19,7 +19,7 @@ final class JsonSchemaValidator
      */
     public function validate(mixed $value, array $schema, ?string $schemaPath = null): array
     {
-        $schema = $this->includeSchemas(
+        $schema = $this->mixinSchemas(
             $schema,
             $schemaPath === null ? null : dirname($schemaPath),
             $schemaPath === null ? [] : [$schemaPath]
@@ -31,73 +31,73 @@ final class JsonSchemaValidator
 
     /**
      * @param array<string, mixed> $schema
-     * @param list<string> $includeStack
+     * @param list<string> $mixinStack
      * @return array<string, mixed>
      */
-    private function includeSchemas(array $schema, ?string $baseDirectory, array $includeStack): array
+    private function mixinSchemas(array $schema, ?string $baseDirectory, array $mixinStack): array
     {
-        if (!isset($schema['$include'])) {
+        if (!isset($schema['$mixin'])) {
             return $schema;
         }
 
-        if (!is_array($schema['$include'])) {
-            throw new \InvalidArgumentException('JSON Schema $include must be an array of strings.');
+        if (!is_array($schema['$mixin'])) {
+            throw new \InvalidArgumentException('JSON Schema $mixin must be an array of strings.');
         }
 
         $mergedSchema = $schema;
-        unset($mergedSchema['$include']);
+        unset($mergedSchema['$mixin']);
 
-        foreach ($schema['$include'] as $includePath) {
-            if (!is_string($includePath)) {
-                throw new \InvalidArgumentException('JSON Schema $include must contain only strings.');
+        foreach ($schema['$mixin'] as $mixinPath) {
+            if (!is_string($mixinPath)) {
+                throw new \InvalidArgumentException('JSON Schema $mixin must contain only strings.');
             }
 
-            $includedSchemaPath = $this->resolveIncludePath($includePath, $baseDirectory);
-            if (in_array($includedSchemaPath, $includeStack, true)) {
+            $mixedSchemaPath = $this->resolveMixinPath($mixinPath, $baseDirectory);
+            if (in_array($mixedSchemaPath, $mixinStack, true)) {
                 throw new \InvalidArgumentException(
-                    sprintf('Circular JSON Schema include detected: %s', $includedSchemaPath)
+                    sprintf('Circular JSON Schema mixin detected: %s', $mixedSchemaPath)
                 );
             }
 
-            $includedSchemaJson = file_get_contents($includedSchemaPath);
-            if ($includedSchemaJson === false) {
+            $mixedSchemaJson = file_get_contents($mixedSchemaPath);
+            if ($mixedSchemaJson === false) {
                 throw new \InvalidArgumentException(
-                    sprintf('Unable to read included JSON Schema: %s', $includedSchemaPath)
+                    sprintf('Unable to read mixed JSON Schema: %s', $mixedSchemaPath)
                 );
             }
 
-            $includedSchema = json_decode($includedSchemaJson, true);
-            if (json_last_error() !== JSON_ERROR_NONE || !is_array($includedSchema) || array_is_list($includedSchema)) {
+            $mixedSchema = json_decode($mixedSchemaJson, true);
+            if (json_last_error() !== JSON_ERROR_NONE || !is_array($mixedSchema) || array_is_list($mixedSchema)) {
                 throw new \InvalidArgumentException(
-                    sprintf('Included JSON Schema is invalid: %s', $includedSchemaPath)
+                    sprintf('Mixed JSON Schema is invalid: %s', $mixedSchemaPath)
                 );
             }
 
-            /** @var array<string, mixed> $includedSchema */
-            $includedSchema = $this->includeSchemas(
-                $includedSchema,
-                dirname($includedSchemaPath),
-                array_merge($includeStack, [$includedSchemaPath])
+            /** @var array<string, mixed> $mixedSchema */
+            $mixedSchema = $this->mixinSchemas(
+                $mixedSchema,
+                dirname($mixedSchemaPath),
+                array_merge($mixinStack, [$mixedSchemaPath])
             );
-            $mergedSchema = $this->mergeIncludedSchema($mergedSchema, $includedSchema, $includedSchemaPath);
+            $mergedSchema = $this->mergeMixedSchema($mergedSchema, $mixedSchema, $mixedSchemaPath);
         }
 
         return $mergedSchema;
     }
 
-    private function resolveIncludePath(string $includePath, ?string $baseDirectory): string
+    private function resolveMixinPath(string $mixinPath, ?string $baseDirectory): string
     {
-        if ($includePath === '') {
-            throw new \InvalidArgumentException('JSON Schema $include path must not be empty.');
+        if ($mixinPath === '') {
+            throw new \InvalidArgumentException('JSON Schema $mixin path must not be empty.');
         }
 
-        $resolvedPath = str_starts_with($includePath, '/')
-            ? $includePath
-            : ($baseDirectory === null ? $includePath : $baseDirectory . '/' . $includePath);
+        $resolvedPath = str_starts_with($mixinPath, '/')
+            ? $mixinPath
+            : ($baseDirectory === null ? $mixinPath : $baseDirectory . '/' . $mixinPath);
         $realPath = realpath($resolvedPath);
 
         if ($realPath === false) {
-            throw new \InvalidArgumentException(sprintf('Included JSON Schema does not exist: %s', $resolvedPath));
+            throw new \InvalidArgumentException(sprintf('Mixed JSON Schema does not exist: %s', $resolvedPath));
         }
 
         return $realPath;
@@ -105,18 +105,18 @@ final class JsonSchemaValidator
 
     /**
      * @param array<string, mixed> $schema
-     * @param array<string, mixed> $includedSchema
+     * @param array<string, mixed> $mixedSchema
      * @return array<string, mixed>
      */
-    private function mergeIncludedSchema(array $schema, array $includedSchema, string $includedSchemaPath): array
+    private function mergeMixedSchema(array $schema, array $mixedSchema, string $mixedSchemaPath): array
     {
-        if (!isset($includedSchema['$defs'])) {
+        if (!isset($mixedSchema['$defs'])) {
             return $schema;
         }
 
-        if (!is_array($includedSchema['$defs']) || array_is_list($includedSchema['$defs'])) {
+        if (!is_array($mixedSchema['$defs']) || array_is_list($mixedSchema['$defs'])) {
             throw new \InvalidArgumentException(
-                sprintf('Included JSON Schema $defs must be an object: %s', $includedSchemaPath)
+                sprintf('Mixed JSON Schema $defs must be an object: %s', $mixedSchemaPath)
             );
         }
 
@@ -128,16 +128,16 @@ final class JsonSchemaValidator
             throw new \InvalidArgumentException('JSON Schema $defs must be an object.');
         }
 
-        foreach ($includedSchema['$defs'] as $name => $definition) {
+        foreach ($mixedSchema['$defs'] as $name => $definition) {
             if (!is_string($name)) {
                 throw new \InvalidArgumentException(
-                    sprintf('Included JSON Schema $defs contains an invalid key: %s', $includedSchemaPath)
+                    sprintf('Mixed JSON Schema $defs contains an invalid key: %s', $mixedSchemaPath)
                 );
             }
 
             if (isset($schema['$defs'][$name])) {
                 throw new \InvalidArgumentException(
-                    sprintf('Duplicate JSON Schema definition "%s" included from %s.', $name, $includedSchemaPath)
+                    sprintf('Duplicate JSON Schema definition "%s" mixed from %s.', $name, $mixedSchemaPath)
                 );
             }
 
@@ -223,13 +223,6 @@ final class JsonSchemaValidator
         $errors = [];
         $properties = isset($schema['properties']) && is_array($schema['properties']) ? $schema['properties'] : [];
 
-        if (isset($schema['minProperties'])
-            && is_int($schema['minProperties'])
-            && count($value) < $schema['minProperties']
-        ) {
-            $errors[] = sprintf('%s must contain at least %d properties.', $path, $schema['minProperties']);
-        }
-
         foreach ($value as $property => $propertyValue) {
             if (!is_string($property)) {
                 $errors[] = sprintf('%s contains an invalid property name.', $path);
@@ -249,17 +242,17 @@ final class JsonSchemaValidator
                 continue;
             }
 
-            if (($schema['additionalProperties'] ?? true) === false) {
+            if (($schema['$include'] ?? true) === false) {
                 $errors[] = sprintf('%s.%s is not an allowed property.', $path, $property);
                 continue;
             }
 
-            if (isset($schema['additionalProperties']) && is_array($schema['additionalProperties'])) {
+            if (isset($schema['$include']) && is_array($schema['$include'])) {
                 $errors = array_merge(
                     $errors,
                     $this->validateAgainstSchema(
                         $propertyValue,
-                        $schema['additionalProperties'],
+                        $schema['$include'],
                         $rootSchema,
                         $path . '.' . $property
                     )
