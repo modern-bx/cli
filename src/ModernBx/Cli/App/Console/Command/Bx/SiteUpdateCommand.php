@@ -84,7 +84,7 @@ class SiteUpdateCommand extends KernelCommand
      */
     private function decodeFields(string $fields): array
     {
-        $decoded = json_decode($fields, true);
+        $decoded = json_decode($fields);
 
         if (json_last_error() !== JSON_ERROR_NONE) {
             throw new \Exception(
@@ -93,12 +93,38 @@ class SiteUpdateCommand extends KernelCommand
             );
         }
 
-        if (!is_array($decoded) || array_is_list($decoded)) {
+        if (!$decoded instanceof \stdClass) {
             throw new \Exception($this->trans("error.site.update_object"), static::CODE_INVALID_ARGUMENT_VALUE);
         }
 
-        /** @var array<string, mixed> $decoded */
-        return $decoded;
+        return $this->jsonObjectToArray($decoded);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function jsonObjectToArray(\stdClass $object): array
+    {
+        $result = [];
+
+        foreach (get_object_vars($object) as $key => $value) {
+            $result[$key] = $this->jsonValueToArray($value);
+        }
+
+        return $result;
+    }
+
+    private function jsonValueToArray(mixed $value): mixed
+    {
+        if ($value instanceof \stdClass) {
+            return $this->jsonObjectToArray($value);
+        }
+
+        if (is_array($value)) {
+            return array_map([$this, 'jsonValueToArray'], $value);
+        }
+
+        return $value;
     }
 
     /**

@@ -9,11 +9,20 @@
         "LICENSE.txt",
         "config/autoload.php",
         "config/cli.php",
-        "config.yml"
+        "config.yml",
+        "lang/ru/messages.php",
+        "lang/en/messages.php"
     ],
     "finder": [
         {
             "name": "*.php",
+            "in": "src",
+            "exclude": [
+                "Compiler"
+            ]
+        },
+        {
+            "name": "*.schema.json",
             "in": "src",
             "exclude": [
                 "Compiler"
