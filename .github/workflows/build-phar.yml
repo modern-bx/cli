@@ -1,0 +1,62 @@
+name: Build PHAR
+
+on:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build application PHAR
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: json, mbstring
+          tools: composer:v2
+          coverage: none
+
+      - name: Cache Composer dependencies
+        uses: actions/cache@v4
+        with:
+          path: vendor
+          key: composer-${{ runner.os }}-${{ hashFiles('composer.lock') }}
+          restore-keys: |
+            composer-${{ runner.os }}-
+
+      - name: Install Composer dependencies
+        run: composer install --prefer-dist --no-interaction --no-progress
+
+      - name: Install Box
+        run: |
+          mkdir -p tools
+          curl -fsSL https://github.com/box-project/box/releases/download/4.6.2/box.phar -o tools/box
+          chmod +x tools/box
+
+      - name: Configure PHAR build
+        run: composer run configure
+
+      - name: Set PHAR build version
+        run: |
+          php -r '$config = json_decode(file_get_contents("box.json"), true); unset($config["git"]); $config["replacements"]["build-version"] = getenv("GITHUB_SHA"); file_put_contents("box.json", json_encode($config, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));'
+
+      - name: Build PHAR
+        run: composer run build
+
+      - name: Upload PHAR artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cli-phar-${{ github.sha }}
+          path: dist/cli.phar
+          if-no-files-found: error
