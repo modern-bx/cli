@@ -67,7 +67,10 @@ final class JsonSchemaValidator
             }
 
             $mixedSchema = json_decode($mixedSchemaJson, true);
-            if (json_last_error() !== JSON_ERROR_NONE || !is_array($mixedSchema) || array_is_list($mixedSchema)) {
+            if (json_last_error() !== JSON_ERROR_NONE
+                || !is_array($mixedSchema)
+                || ($mixedSchema !== [] && array_is_list($mixedSchema))
+            ) {
                 throw new \InvalidArgumentException(
                     sprintf('Mixed JSON Schema is invalid: %s', $mixedSchemaPath)
                 );
@@ -149,7 +152,9 @@ final class JsonSchemaValidator
             return $schema;
         }
 
-        if (!is_array($mixedSchema['$defs']) || array_is_list($mixedSchema['$defs'])) {
+        if (!is_array($mixedSchema['$defs'])
+            || ($mixedSchema['$defs'] !== [] && array_is_list($mixedSchema['$defs']))
+        ) {
             throw new \InvalidArgumentException(
                 sprintf('Mixed JSON Schema $defs must be an object: %s', $mixedSchemaPath)
             );
@@ -159,7 +164,7 @@ final class JsonSchemaValidator
             $schema['$defs'] = [];
         }
 
-        if (!is_array($schema['$defs']) || array_is_list($schema['$defs'])) {
+        if (!is_array($schema['$defs']) || ($schema['$defs'] !== [] && array_is_list($schema['$defs']))) {
             throw new \InvalidArgumentException('JSON Schema $defs must be an object.');
         }
 
@@ -231,7 +236,7 @@ final class JsonSchemaValidator
             $errors[] = sprintf('%s must be one of the allowed values.', $path);
         }
 
-        if (is_array($value) && !array_is_list($value)) {
+        if (is_array($value) && ($value === [] || !array_is_list($value))) {
             $errors = array_merge($errors, $this->validateObject($value, $schema, $rootSchema, $path));
         }
 
@@ -304,7 +309,7 @@ final class JsonSchemaValidator
     private function matchesAnyType(mixed $value, array $types): bool
     {
         foreach ($types as $type) {
-            if ($type === 'object' && is_array($value) && !array_is_list($value)) {
+            if ($type === 'object' && is_array($value) && ($value === [] || !array_is_list($value))) {
                 return true;
             }
             if ($type === 'array' && is_array($value) && array_is_list($value)) {
