@@ -7,15 +7,32 @@ declare(strict_types=1);
 namespace ModernBx\Cli\App\Console\Command\Bx;
 
 use ModernBx\Cli\App\Console\Mixin\Common\IO;
+use ModernBx\Cli\App\Service\ClassAliasLoader;
+use ModernBx\Cli\App\Service\Remote\BitrixAdminClient;
+use ModernBx\Cli\App\Service\Remote\RemoteProjectConfigManager;
+use ModernBx\Cli\App\Service\Remote\RemotePhpTrait;
 use ModernBx\Cli\App\Validation\JsonSchemaValidator;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputDefinition;
 use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 
 class SiteUpdateCommand extends KernelCommand
 {
     use IO;
+    use RemotePhpTrait;
+
+    public function __construct(
+        ClassAliasLoader $aliasLoader,
+        RemoteProjectConfigManager $remoteProjectConfigManager,
+        BitrixAdminClient $bitrixAdminClient
+    ) {
+        parent::__construct($aliasLoader);
+
+        $this->remoteProjectConfigManager = $remoteProjectConfigManager;
+        $this->bitrixAdminClient = $bitrixAdminClient;
+    }
 
     /**
      * @var string
@@ -29,6 +46,12 @@ class SiteUpdateCommand extends KernelCommand
             ->setHelp($this->trans("command.site_update.help"))
             ->setDefinition(
                 new InputDefinition([
+                    new InputOption(
+                        'remote',
+                        null,
+                        InputOption::VALUE_REQUIRED,
+                        'Кодовое имя удаленного проекта',
+                    ),
                     new InputArgument(
                         'LID',
                         InputArgument::REQUIRED,
@@ -51,8 +74,21 @@ class SiteUpdateCommand extends KernelCommand
      */
     protected function executeInternal(InputInterface $input, OutputInterface $output): void
     {
-        parent::executeInternal($input, $output);
+        $remote = $input->getOption('remote');
 
+        if (is_string($remote)) {
+            $this->printer = $this->getPrinter($output);
+            $this->verbose = $input->getOption('verbose') !== false;
+            $this->executeRemote($input, $remote);
+            return;
+        }
+
+        parent::executeInternal($input, $output);
+        $this->executeLocal($input);
+    }
+
+    protected function executeLocal(InputInterface $input): void
+    {
         $lid = $input->getArgument("LID");
         $fields = $input->getArgument("fields");
 
@@ -75,6 +111,32 @@ class SiteUpdateCommand extends KernelCommand
         if (!$result->isSuccess()) {
             throw new \Exception(implode(PHP_EOL, $result->getErrorMessages()), static::CODE_INVALID_ARGUMENT_VALUE);
         }
+    }
+
+    protected function executeRemote(InputInterface $input, string $remote): void
+    {
+        $lid = $input->getArgument("LID");
+        $fields = $input->getArgument("fields");
+
+        if (!is_string($lid)) {
+            throw new \Exception($this->trans("error.site.lid_string"), static::CODE_INVALID_ARGUMENT_VALUE);
+        }
+
+        if (!is_string($fields)) {
+            throw new \Exception($this->trans("error.site.update_json_string"), static::CODE_INVALID_ARGUMENT_VALUE);
+        }
+
+        /** @var array<string, mixed> $decodedFields */
+        $decodedFields = $this->decodeFields($fields);
+        $this->validateFields($decodedFields);
+
+        $this->decodeRemoteJsonResult(
+            $this->executeRemotePhp(
+                $remote,
+                $this->buildRemoteSiteCode('update', ['lid' => $lid, 'fields' => $decodedFields]),
+            ),
+            'Не удалось обновить сайт удаленного проекта.',
+        );
     }
 
     /**

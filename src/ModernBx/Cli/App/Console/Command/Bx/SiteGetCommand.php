@@ -7,6 +7,10 @@ declare(strict_types=1);
 namespace ModernBx\Cli\App\Console\Command\Bx;
 
 use ModernBx\Cli\App\Console\Mixin\Common\IO;
+use ModernBx\Cli\App\Service\ClassAliasLoader;
+use ModernBx\Cli\App\Service\Remote\BitrixAdminClient;
+use ModernBx\Cli\App\Service\Remote\RemoteProjectConfigManager;
+use ModernBx\Cli\App\Service\Remote\RemotePhpTrait;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputDefinition;
 use Symfony\Component\Console\Input\InputInterface;
@@ -18,6 +22,18 @@ use function ModernBx\CommonFunctions\to_json;
 class SiteGetCommand extends KernelCommand
 {
     use IO;
+    use RemotePhpTrait;
+
+    public function __construct(
+        ClassAliasLoader $aliasLoader,
+        RemoteProjectConfigManager $remoteProjectConfigManager,
+        BitrixAdminClient $bitrixAdminClient
+    ) {
+        parent::__construct($aliasLoader);
+
+        $this->remoteProjectConfigManager = $remoteProjectConfigManager;
+        $this->bitrixAdminClient = $bitrixAdminClient;
+    }
 
     /**
      * @var string
@@ -31,6 +47,12 @@ class SiteGetCommand extends KernelCommand
             ->setHelp($this->trans("command.site_get.help"))
             ->setDefinition(
                 new InputDefinition([
+                    new InputOption(
+                        'remote',
+                        null,
+                        InputOption::VALUE_REQUIRED,
+                        'Кодовое имя удаленного проекта',
+                    ),
                     new InputOption(
                         'select',
                         null,
@@ -60,8 +82,21 @@ class SiteGetCommand extends KernelCommand
      */
     protected function executeInternal(InputInterface $input, OutputInterface $output): void
     {
-        parent::executeInternal($input, $output);
+        $remote = $input->getOption('remote');
 
+        if (is_string($remote)) {
+            $this->printer = $this->getPrinter($output);
+            $this->verbose = $input->getOption('verbose') !== false;
+            $this->executeRemote($input, $remote);
+            return;
+        }
+
+        parent::executeInternal($input, $output);
+        $this->executeLocal($input);
+    }
+
+    protected function executeLocal(InputInterface $input): void
+    {
         $siteId = $input->getArgument("id");
 
         if (!is_string($siteId)) {
@@ -100,6 +135,49 @@ class SiteGetCommand extends KernelCommand
         }
 
         $this->printer->info((string) to_json($site, $flags));
+    }
+
+    protected function executeRemote(InputInterface $input, string $remote): void
+    {
+        $siteId = $input->getArgument("id");
+
+        if (!is_string($siteId)) {
+            throw new \Exception($this->trans("error.site.id_string"), static::CODE_INVALID_ARGUMENT_VALUE);
+        }
+
+        $query = [
+            "filter" => ["=LID" => $siteId],
+            "limit" => 1,
+        ];
+        $select = $input->getOption("select");
+
+        if ($select !== null) {
+            if (!is_string($select)) {
+                throw new \Exception(
+                    $this->trans("error.option_json_string", ["%option%" => "select"]),
+                    static::CODE_INVALID_OPTION_VALUE
+                );
+            }
+
+            $query["select"] = $this->decodeSelectOption($select);
+        }
+
+        $flags = JSON_UNESCAPED_UNICODE;
+
+        if ($input->getOption("pretty")) {
+            $flags |= JSON_PRETTY_PRINT;
+        }
+
+        $line = $this->decodeRemoteJsonResult(
+            $this->executeRemotePhp($remote, $this->buildRemoteSiteCode('get', ['query' => $query, 'flags' => $flags])),
+            'Не удалось получить сайт удаленного проекта.',
+        );
+
+        if ($line === null) {
+            return;
+        }
+
+        $this->printer->info(is_scalar($line) ? (string) $line : '');
     }
 
     /**

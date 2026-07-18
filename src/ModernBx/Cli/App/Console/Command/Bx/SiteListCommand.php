@@ -7,6 +7,10 @@ declare(strict_types=1);
 namespace ModernBx\Cli\App\Console\Command\Bx;
 
 use ModernBx\Cli\App\Console\Mixin\Common\IO;
+use ModernBx\Cli\App\Service\ClassAliasLoader;
+use ModernBx\Cli\App\Service\Remote\BitrixAdminClient;
+use ModernBx\Cli\App\Service\Remote\RemoteProjectConfigManager;
+use ModernBx\Cli\App\Service\Remote\RemotePhpTrait;
 use Symfony\Component\Console\Input\InputDefinition;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
@@ -17,6 +21,18 @@ use function ModernBx\CommonFunctions\to_json;
 class SiteListCommand extends KernelCommand
 {
     use IO;
+    use RemotePhpTrait;
+
+    public function __construct(
+        ClassAliasLoader $aliasLoader,
+        RemoteProjectConfigManager $remoteProjectConfigManager,
+        BitrixAdminClient $bitrixAdminClient
+    ) {
+        parent::__construct($aliasLoader);
+
+        $this->remoteProjectConfigManager = $remoteProjectConfigManager;
+        $this->bitrixAdminClient = $bitrixAdminClient;
+    }
 
     /**
      * @var string
@@ -30,6 +46,12 @@ class SiteListCommand extends KernelCommand
             ->setHelp($this->trans("command.site_list.help"))
             ->setDefinition(
                 new InputDefinition([
+                    new InputOption(
+                        'remote',
+                        null,
+                        InputOption::VALUE_REQUIRED,
+                        'Кодовое имя удаленного проекта',
+                    ),
                     new InputOption(
                         'filter',
                         null,
@@ -66,8 +88,21 @@ class SiteListCommand extends KernelCommand
      */
     protected function executeInternal(InputInterface $input, OutputInterface $output): void
     {
-        parent::executeInternal($input, $output);
+        $remote = $input->getOption('remote');
 
+        if (is_string($remote)) {
+            $this->printer = $this->getPrinter($output);
+            $this->verbose = $input->getOption('verbose') !== false;
+            $this->executeRemote($input, $remote);
+            return;
+        }
+
+        parent::executeInternal($input, $output);
+        $this->executeLocal($input);
+    }
+
+    protected function executeLocal(InputInterface $input): void
+    {
         $query = [];
 
         foreach (["filter", "order", "select"] as $option) {
@@ -100,6 +135,53 @@ class SiteListCommand extends KernelCommand
         while ($site = $cursor->fetch()) {
             $this->printer->info((string) to_json($site, $flags));
         }
+    }
+
+    protected function executeRemote(InputInterface $input, string $remote): void
+    {
+        $query = [];
+
+        foreach (["filter", "order", "select"] as $option) {
+            $value = $input->getOption($option);
+
+            if ($value === null) {
+                continue;
+            }
+
+            if (!is_string($value)) {
+                throw new \Exception(
+                    $this->trans("error.option_json_string", ["%option%" => $option]),
+                    static::CODE_INVALID_OPTION_VALUE
+                );
+            }
+
+            $query[$option] = $this->decodeJsonOption($option, $value);
+        }
+
+        $flags = JSON_UNESCAPED_UNICODE;
+
+        if ($input->getOption("pretty")) {
+            $flags |= JSON_PRETTY_PRINT;
+        }
+
+        $result = $this->decodeRemoteJsonResult(
+            $this->executeRemotePhp($remote, $this->buildRemoteListCode($query, $flags)),
+            'Не удалось получить список сайтов удаленного проекта.',
+        );
+
+        if (!is_array($result)) {
+            throw new \RuntimeException('Удаленная PHP-консоль вернула некорректный список сайтов.');
+        }
+
+        foreach ($result as $line) {
+            $this->printer->info(is_scalar($line) ? (string) $line : '');
+        }
+    }
+
+    /** @param array<string, mixed> $query */
+    protected function buildRemoteListCode(array $query, int $flags): string
+    {
+        return $this->buildRemoteSiteCode('list', ['query' => $query, 'flags' => $flags]);
     }
 
     /**

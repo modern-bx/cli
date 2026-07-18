@@ -98,30 +98,33 @@ php cli.phar setting:set cache.type '{"value":"memcache"}'
 php cli.phar setting:set --extra custom.flag true
 ```
 
-## `site:list [--filter=<json>] [--order=<json>] [--select=<json>]`
+## `site:list [--remote=<codename>] [--filter=<json>] [--order=<json>] [--select=<json>]`
 
-Печатает сайты как JSON-строки через `Bitrix\Main\SiteTable::getList`. Опции напрямую соответствуют параметрам `filter`, `order`, `select`.
+Печатает сайты как JSON-строки через `Bitrix\Main\SiteTable::getList`. Опции напрямую соответствуют параметрам `filter`, `order`, `select`. С `--remote` выполняет D7-операцию на зарегистрированном удалённом проекте через PHP-консоль админки.
 
 ```bash
 php cli.phar site:list
 php cli.phar site:list --filter='{"ACTIVE":"Y"}' --order='{"SORT":"ASC"}'
+php cli.phar site:list --remote=prod --select='["LID","NAME"]'
 ```
 
-## `site:get [--select=<json>] <id>`
+## `site:get [--remote=<codename>] [--select=<json>] <id>`
 
-Печатает поля одного сайта по LID.
+Печатает поля одного сайта по LID. С `--remote` получает сайт на зарегистрированном удалённом проекте через D7 `SiteTable`.
 
 ```bash
 php cli.phar site:get s1
 php cli.phar site:get --select='["LID","NAME","DIR"]' s1
+php cli.phar site:get --remote=prod s1
 ```
 
-## `site:update <LID> <fields-json>`
+## `site:update [--remote=<codename>] <LID> <fields-json>`
 
-Обновляет поля сайта через `SiteTable::update`. Второй аргумент должен быть JSON-объектом.
+Обновляет поля сайта через `SiteTable::update`. Второй аргумент должен быть JSON-объектом. С `--remote` валидирует JSON локально, а обновление выполняет на зарегистрированном удалённом проекте через D7.
 
 ```bash
 php cli.phar site:update s1 '{"NAME":"Основной сайт"}'
+php cli.phar site:update --remote=prod s1 '{"NAME":"Основной сайт"}'
 ```
 
 ## `php:exec [--remote=<codename>]`
