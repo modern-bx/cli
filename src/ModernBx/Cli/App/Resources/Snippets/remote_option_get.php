@@ -35,14 +35,8 @@ try {
         $unserializedValue = @unserialize($optionValue);
     }
 
-    $line = json_encode($unserializedValue ?? $optionValue, JSON_UNESCAPED_UNICODE);
-
-    if (!is_string($line)) {
-        throw new RuntimeException('Не удалось сериализовать опцию в JSON.');
-    }
-
     /** @phpstan-ignore-next-line */
-    echo CommandResult::success($line);
+    echo CommandResult::success($unserializedValue ?? $optionValue);
 } catch (Throwable $err) {
     /** @phpstan-ignore-next-line */
     echo CommandResult::error($err->getMessage());

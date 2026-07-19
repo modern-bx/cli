@@ -118,7 +118,7 @@ class GetCommand extends KernelCommand
             $unserializedValue = @unserialize($optionValue);
         }
 
-        $this->printer->info((string) to_json($unserializedValue ?? $optionValue));
+        $this->printer->info($this->formatOptionValue($unserializedValue ?? $optionValue));
     }
 
     /**
@@ -137,7 +137,16 @@ class GetCommand extends KernelCommand
             'Не удалось получить опцию удаленного проекта.',
         );
 
-        $this->printer->info(is_scalar($line) ? (string) $line : '');
+        $this->printer->info($this->formatOptionValue($line));
+    }
+
+    private function formatOptionValue(mixed $value): string
+    {
+        if (is_scalar($value)) {
+            return (string) $value;
+        }
+
+        return (string) to_json($value);
     }
 
     /**
