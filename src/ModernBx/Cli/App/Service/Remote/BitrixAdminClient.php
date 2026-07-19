@@ -285,20 +285,10 @@ final class BitrixAdminClient
         $response = $this->post(
             $endpoint . '/bitrix/admin/fileman_newfolder.php',
             [
-                'logical' => '',
-                'filter' => 'Y',
-                'set_filter' => 'Y',
-                'site' => 's1',
                 'path' => $directory,
                 'save' => 'Y',
-                'back_url' => '',
-                'lang' => 'ru',
-                'ID' => '',
-                'bxfm_linked' => 'Y',
                 'sessid' => $sessid,
-                'sectionname' => $folderName,
                 'foldername' => $folderName,
-                'tabControl_active_tab' => 'edit1',
             ],
             $this->getFileNewFolderHeaders($endpoint, $sessionId, $directory),
         );

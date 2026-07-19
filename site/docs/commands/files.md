@@ -51,3 +51,12 @@ php cli.phar file:mkdir --remote=prod local/cache/custom
 php cli.phar file:delete upload/old.csv
 php cli.phar file:delete --remote=prod upload/old.csv
 ```
+
+## `file:rmdir [--remote=<codename>] <path>`
+
+Удаляет директорию по пути относительно document root локального или удалённого проекта. Команда работает как отдельный алиас логики `file:delete`.
+
+```bash
+php cli.phar file:rmdir upload/old-dir
+php cli.phar file:rmdir --remote=prod upload/old-dir
+```
