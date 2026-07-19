@@ -34,6 +34,15 @@ php cli.phar file:put --remote=prod --force ./robots.txt robots.txt
 
 Опция `--force` удаляет удалённый файл перед загрузкой.
 
+## `file:mkdir [--remote=<codename>] <directory-path>`
+
+Создает директорию по пути относительно document root локального или удалённого проекта. Промежуточные директории в локальном режиме создаются автоматически.
+
+```bash
+php cli.phar file:mkdir local/cache/custom
+php cli.phar file:mkdir --remote=prod local/cache/custom
+```
+
 ## `file:delete [--remote=<codename>] <path>`
 
 Удаляет файл по пути относительно document root локального или удалённого проекта.

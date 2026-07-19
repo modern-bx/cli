@@ -271,6 +271,58 @@ final class BitrixAdminClient
         }
     }
 
+    public function createDirectory(string $endpoint, string $sessionId, string $path): void
+    {
+        $directory = dirname($path);
+        $folderName = basename($path);
+        $newFolderPagePath = '/bitrix/admin/fileman_newfolder.php?'
+            . http_build_query([
+                'lang' => 'ru',
+                'site' => 's1',
+                'path' => $directory,
+            ]);
+        $sessid = $this->getFileNewFolderSessid($endpoint, $sessionId, $directory, $newFolderPagePath);
+        $response = $this->post(
+            $endpoint . '/bitrix/admin/fileman_newfolder.php',
+            [
+                'logical' => '',
+                'filter' => 'Y',
+                'set_filter' => 'Y',
+                'site' => 's1',
+                'path' => $directory,
+                'save' => 'Y',
+                'back_url' => '',
+                'lang' => 'ru',
+                'ID' => '',
+                'bxfm_linked' => 'Y',
+                'sessid' => $sessid,
+                'sectionname' => $folderName,
+                'foldername' => $folderName,
+                'tabControl_active_tab' => 'edit1',
+            ],
+            $this->getFileNewFolderHeaders($endpoint, $sessionId, $directory),
+        );
+
+        if ($response['status'] === 401
+            || $response['status'] === 403
+            || $this->looksLikeLoginForm($response['body'])
+        ) {
+            throw new \RuntimeException('REMOTE_SESSION_EXPIRED');
+        }
+
+        if ($response['status'] >= 300 && $response['status'] < 400) {
+            return;
+        }
+
+        $filemanError = $this->extractFilemanError($response['body']);
+
+        if ($filemanError !== null) {
+            throw new \RuntimeException($filemanError, 1);
+        }
+
+        throw new \RuntimeException('Не удалось создать директорию на удаленном проекте.');
+    }
+
     protected function stringifyRemoteSqlValue(mixed $value): string
     {
         if ($value === null) {
@@ -498,6 +550,31 @@ final class BitrixAdminClient
         return $this->extractSessid($response['body']);
     }
 
+    protected function getFileNewFolderSessid(
+        string $endpoint,
+        string $sessionId,
+        string $path,
+        string $newFolderPagePath
+    ): string {
+        $response = $this->get(
+            $endpoint . $newFolderPagePath,
+            $this->getFileNewFolderHeaders($endpoint, $sessionId, $path),
+        );
+
+        if ($response['status'] === 401
+            || $response['status'] === 403
+            || $this->looksLikeLoginForm($response['body'])
+        ) {
+            throw new \RuntimeException('REMOTE_SESSION_EXPIRED');
+        }
+
+        if ($response['status'] < 200 || $response['status'] >= 400) {
+            throw new \RuntimeException('Не удалось открыть страницу создания директории удаленного проекта.');
+        }
+
+        return $this->extractSessid($response['body']);
+    }
+
     protected function getFilemanAdminSessid(
         string $endpoint,
         string $sessionId,
@@ -546,6 +623,26 @@ final class BitrixAdminClient
     protected function getFileUploadHeaders(string $endpoint, string $sessionId, string $path): array
     {
         $referer = $endpoint . '/bitrix/admin/fileman_file_upload.php?'
+            . http_build_query([
+                'lang' => 'ru',
+                'site' => 's1',
+                'path' => $path,
+            ]);
+
+        return [
+            'Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'Origin: ' . $endpoint,
+            'Referer: ' . $referer,
+            'Cookie: PHPSESSID=' . $sessionId,
+        ];
+    }
+
+    /**
+     * @return string[]
+     */
+    protected function getFileNewFolderHeaders(string $endpoint, string $sessionId, string $path): array
+    {
+        $referer = $endpoint . '/bitrix/admin/fileman_newfolder.php?'
             . http_build_query([
                 'lang' => 'ru',
                 'site' => 's1',
