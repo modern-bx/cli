@@ -95,6 +95,8 @@ class AppCommand extends GenericCommand
         $this->verbose = $input->getOption("verbose") !== false;
 
         try {
+            $this->validateRemoteModeOptions($input);
+
             if ($this->applySessionRemote($input, $output)) {
                 return static::CODE_SUCCESS;
             }
@@ -104,6 +106,19 @@ class AppCommand extends GenericCommand
         } catch (\Throwable $err) {
             $this->printer->error($err->getMessage());
             return $err->getCode();
+        }
+    }
+
+    protected function validateRemoteModeOptions(InputInterface $input): void
+    {
+        $local = $input->hasOption('local') && $input->getOption('local') === true;
+        $remote = $input->hasOption('remote') ? $input->getOption('remote') : null;
+
+        if ($local && $remote !== null) {
+            throw new \Exception(
+                'Опции --remote и --local нельзя указывать одновременно.',
+                static::CODE_INVALID_OPTION_VALUE,
+            );
         }
     }
 
