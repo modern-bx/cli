@@ -13,7 +13,7 @@ use Symfony\Component\Console\Input\ArrayInput;
 
 final class ListCommandTest extends TestCase
 {
-    public function testRemoteShortUsesDefaultTemplateAndServerNameLink(): void
+    public function testRemoteShortUsesDefaultTemplate(): void
     {
         $command = $this->createCommand();
         $command->remoteResponses[] = json_encode([

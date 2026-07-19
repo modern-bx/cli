@@ -264,9 +264,7 @@ class ListCommand extends KernelCommand
             function (array $matches) use ($site): string {
                 $key = $matches[1];
                 $value = $site[$key] ?? '';
-                $formatted = $this->stringifyValue($value);
-
-                return $key === 'SERVER_NAME' ? $this->formatServerNameLink($formatted) : $formatted;
+                return $this->stringifyValue($value);
             },
             $template
         );
@@ -324,17 +322,6 @@ class ListCommand extends KernelCommand
             }
         }
         return $headers;
-    }
-
-    private function formatServerNameLink(string $serverName): string
-    {
-        if ($serverName === '') {
-            return '';
-        }
-
-        $url = str_starts_with($serverName, 'https://') ? $serverName : 'https://' . $serverName;
-
-        return sprintf('<href=%s>%s</>', $url, $serverName);
     }
 
     private function getOutput(): OutputInterface

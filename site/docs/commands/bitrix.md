@@ -109,7 +109,7 @@ php cli.phar setting:set --extra custom.flag true
 
 ## `site:list [--remote=<codename>] [--filter=<json>] [--order=<json>] [--select=<json>] [--pretty] [--short[=<format>]] [--format=<table|csv>]`
 
-Печатает сайты через `Bitrix\Main\SiteTable::getList`. По умолчанию выводит JSON-строки, с `--pretty` форматирует JSON. Опции `--short` и `--format` переключают вывод из JSON в строковый шаблон, консольную таблицу или CSV; они несовместимы между собой. В шаблоне `--short` подстановки задаются как `$FIELD`, а `$SERVER_NAME` выводится консольной ссылкой с префиксом `https://`. Опции `filter`, `order`, `select` напрямую соответствуют параметрам D7. С `--remote` выполняет D7-операцию на зарегистрированном удалённом проекте через PHP-консоль админки.
+Печатает сайты через `Bitrix\Main\SiteTable::getList`. По умолчанию выводит JSON-строки, с `--pretty` форматирует JSON. Опции `--short` и `--format` переключают вывод из JSON в строковый шаблон, консольную таблицу или CSV; они несовместимы между собой. В шаблоне `--short` подстановки задаются как `$FIELD`. Опции `filter`, `order`, `select` напрямую соответствуют параметрам D7. С `--remote` выполняет D7-операцию на зарегистрированном удалённом проекте через PHP-консоль админки.
 
 ```bash
 php cli.phar site:list
