@@ -51,6 +51,7 @@ class ApplyCommand extends BxCommand
             ->addOption('local', null, InputOption::VALUE_NONE, 'Отключить неявный remote текущей сессии')
             ->addOption('force', null, InputOption::VALUE_NONE, 'Перезаписать существующие файлы')
             ->addOption('yes', 'y', InputOption::VALUE_NONE, 'Не запрашивать подтверждение при замечаниях')
+            ->addOption('chunk-size', null, InputOption::VALUE_REQUIRED, 'Размер части файла в байтах')
             ->addArgument('src', InputArgument::REQUIRED, 'Локальная директория-источник')
             ->addArgument('dest', InputArgument::REQUIRED, 'Директория назначения относительно document root проекта');
     }
@@ -72,12 +73,13 @@ class ApplyCommand extends BxCommand
         $dest = $this->normalizeProjectPath($destArgument);
         $force = $input->getOption('force') === true;
         $yes = $input->getOption('yes') === true;
+        $chunkSize = $this->resolveChunkSizeOption($input);
         $plan = $this->buildPlan($src, $dest);
 
         if (is_string($remote)) {
             $this->printer = $this->getPrinter($output);
             $this->verbose = $input->getOption('verbose') !== false;
-            $this->executeRemote($remote, $src, $dest, $plan, $force, $yes, $input, $output);
+            $this->executeRemote($remote, $src, $dest, $plan, $force, $yes, $chunkSize, $input, $output);
             return;
         }
 
@@ -114,6 +116,7 @@ class ApplyCommand extends BxCommand
         array $plan,
         bool $force,
         bool $yes,
+        ?int $chunkSizeOverride,
         InputInterface $input,
         OutputInterface $output
     ): void {
@@ -144,10 +147,6 @@ class ApplyCommand extends BxCommand
 ): array {
             return $this->loadRemoteUploadLimits($endpoint, $sessionId);
         });
-        $diagnostics['errors'] = array_merge(
-            $diagnostics['errors'],
-            $this->diagnoseRemoteUploadLimits($plan['files'], $limits),
-        );
         $this->printDiagnostics($diagnostics);
         $this->ensureCanContinue($diagnostics, $src, $dest, $yes, $input, $output);
 
@@ -161,7 +160,17 @@ class ApplyCommand extends BxCommand
 ): int {
             return $this->createRemoteDirectories($endpoint, $sessionId, $dest, $plan['directories']);
         });
-        $stats = $this->uploadRemoteFiles($codename, $config, $endpoint, $sessionId, $dest, $plan['files'], $output);
+        $chunkSize = $this->resolveUploadChunkSize($limits['max_post_file_bytes'], $chunkSizeOverride);
+        $stats = $this->uploadRemoteFiles(
+            $codename,
+            $config,
+            $endpoint,
+            $sessionId,
+            $dest,
+            $plan['files'],
+            $chunkSize,
+            $output,
+        );
 
         $this->printSummary($stats['files'], $stats['bytes'], $createdDirectories);
     }
@@ -217,6 +226,25 @@ class ApplyCommand extends BxCommand
         usort($files, static fn (array $a, array $b): int => strcmp($a['relative'], $b['relative']));
 
         return ['directories' => $directories, 'files' => $files];
+    }
+
+
+    protected function resolveChunkSizeOption(InputInterface $input): ?int
+    {
+        $value = $input->getOption('chunk-size');
+
+        if ($value === null || $value === false || $value === '') {
+            return null;
+        }
+
+        if (!is_string($value) || !ctype_digit($value) || (int) $value < 1) {
+            throw new \RuntimeException(
+                'Опция --chunk-size должна быть положительным целым числом байт.',
+                static::CODE_INVALID_OPTION_VALUE,
+            );
+        }
+
+        return (int) $value;
     }
 
     protected function resolveSourceDirectory(string $path): string
@@ -550,6 +578,7 @@ class ApplyCommand extends BxCommand
         string $sessionId,
         string $dest,
         array $files,
+        ?int $chunkSize,
         OutputInterface $output
     ): array {
         $uploaded = 0;
@@ -560,22 +589,215 @@ class ApplyCommand extends BxCommand
             $directory = dirname($target);
             $filename = basename($target);
             $this->printer->info(sprintf('Загрузка файла: %s', $target));
-            $this->withRemoteSessionRetry($codename, $config, $endpoint, $sessionId, function (
-                string $sessionId
-            ) use (
-                $endpoint,
-                $file,
-                $directory,
-                $filename
+            if ($chunkSize !== null && $file['size'] > $chunkSize) {
+                $sessionId = $this->uploadFileInChunks(
+                    $codename,
+                    $config,
+                    $endpoint,
+                    $sessionId,
+                    $file['path'],
+                    $file['size'],
+                    $directory,
+                    $filename,
+                    $chunkSize,
+                );
+            } else {
+                $this->withRemoteSessionRetry($codename, $config, $endpoint, $sessionId, function (
+                    string $sessionId
+                ) use (
+                    $endpoint,
+                    $file,
+                    $directory,
+                    $filename
 ): void {
-                $this->bitrixAdminClient->uploadFile($endpoint, $sessionId, $file['path'], $directory, $filename);
-            });
+                    $this->bitrixAdminClient->uploadFile($endpoint, $sessionId, $file['path'], $directory, $filename);
+                });
+            }
 
             $uploaded++;
             $bytes += $file['size'];
         }
 
         return ['files' => $uploaded, 'bytes' => $bytes];
+    }
+
+    protected function resolveUploadChunkSize(int $limit, ?int $chunkSizeOverride): ?int
+    {
+        if ($chunkSizeOverride !== null) {
+            return $chunkSizeOverride;
+        }
+
+        if ($limit <= 0) {
+            return null;
+        }
+
+        $reserve = max(65536, (int) ceil($limit * 0.05));
+        $chunkSize = $limit - $reserve;
+
+        if ($chunkSize < 1) {
+            throw new \RuntimeException(
+                sprintf('Лимит загрузки PHP слишком мал для передачи файла частями: %d байт.', $limit),
+                static::CODE_INVALID_ARGUMENT_VALUE,
+            );
+        }
+
+        return $chunkSize;
+    }
+
+    /** @param mixed[] $config */
+    protected function uploadFileInChunks(
+        string $codename,
+        array $config,
+        string $endpoint,
+        string $sessionId,
+        string $src,
+        int $size,
+        string $remoteDirectory,
+        string $filename,
+        int $chunkSize
+    ): string {
+        $chunkCount = (int) ceil($size / $chunkSize);
+        $prefix = '.' . $filename . '.upload-' . bin2hex(random_bytes(8));
+        $remoteChunks = [];
+        $source = fopen($src, 'rb');
+
+        if ($source === false) {
+            throw new \RuntimeException(sprintf('Не удалось открыть файл для чтения: %s', $src), static::CODE_IO_ERROR);
+        }
+
+        try {
+            for ($index = 1; $index <= $chunkCount; $index++) {
+                $chunkFilename = sprintf('%s.part%05d', $prefix, $index);
+                $chunkPath = $this->writeLocalChunk($source, $chunkSize, $chunkFilename);
+
+                try {
+                    try {
+                        $this->bitrixAdminClient->uploadFile(
+                            $endpoint,
+                            $sessionId,
+                            $chunkPath,
+                            $remoteDirectory,
+                            $chunkFilename,
+                        );
+                    } catch (\RuntimeException $err) {
+                        if ($err->getMessage() !== 'REMOTE_SESSION_EXPIRED') {
+                            throw $err;
+                        }
+
+                        $sessionId = $this->remoteProjectConfigManager->refreshSession($codename, $config);
+                        $this->bitrixAdminClient->uploadFile(
+                            $endpoint,
+                            $sessionId,
+                            $chunkPath,
+                            $remoteDirectory,
+                            $chunkFilename,
+                        );
+                    }
+                } finally {
+                    @unlink($chunkPath);
+                }
+
+                $remoteChunks[] = rtrim($remoteDirectory, '/') . '/' . $chunkFilename;
+                $sent = min($size, $index * $chunkSize);
+                $percent = $size === 0 ? 100 : (int) floor($sent * 100 / $size);
+                $this->printer->info(sprintf(
+                    'Отправлена часть %d/%d (~%s из ~%s, %d%%).',
+                    $index,
+                    $chunkCount,
+                    $this->formatBytes($sent),
+                    $this->formatBytes($size),
+                    $percent,
+                ));
+            }
+        } finally {
+            fclose($source);
+        }
+
+        return $this->mergeRemoteChunks(
+            $codename,
+            $config,
+            $endpoint,
+            $sessionId,
+            $remoteChunks,
+            rtrim($remoteDirectory, '/') . '/' . $filename,
+        );
+    }
+
+    /** @param resource $source */
+    protected function writeLocalChunk($source, int $chunkSize, string $chunkFilename): string
+    {
+        $chunkPath = rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . $chunkFilename;
+        $target = fopen($chunkPath, 'wb');
+
+        if ($target === false) {
+            throw new \RuntimeException(
+                sprintf('Не удалось создать временный файл: %s', $chunkPath),
+                static::CODE_IO_ERROR,
+            );
+        }
+
+        try {
+            $remaining = $chunkSize;
+
+            while ($remaining > 0 && !feof($source)) {
+                $buffer = fread($source, min($remaining, 1024 * 1024));
+
+                if ($buffer === false) {
+                    throw new \RuntimeException('Не удалось прочитать очередную часть файла.', static::CODE_IO_ERROR);
+                }
+
+                if ($buffer === '') {
+                    break;
+                }
+
+                if (fwrite($target, $buffer) === false) {
+                    throw new \RuntimeException('Не удалось записать временную часть файла.', static::CODE_IO_ERROR);
+                }
+
+                $remaining -= strlen($buffer);
+            }
+        } finally {
+            fclose($target);
+        }
+
+        return $chunkPath;
+    }
+
+    /**
+     * @param mixed[] $config
+     * @param string[] $chunks
+     */
+    protected function mergeRemoteChunks(
+        string $codename,
+        array $config,
+        string $endpoint,
+        string $sessionId,
+        array $chunks,
+        string $destination
+    ): string {
+        $code = $this->remoteFilePhpCodeBuilder->buildMergeChunks($destination, $chunks);
+
+        try {
+            $json = $this->bitrixAdminClient->executePhp($endpoint, $sessionId, $code);
+        } catch (\RuntimeException $err) {
+            if ($err->getMessage() !== 'REMOTE_SESSION_EXPIRED') {
+                throw $err;
+            }
+
+            $sessionId = $this->remoteProjectConfigManager->refreshSession($codename, $config);
+            $json = $this->bitrixAdminClient->executePhp($endpoint, $sessionId, $code);
+        }
+
+        $result = json_decode($json, true);
+
+        if (!is_array($result) || ($result['ok'] ?? false) !== true) {
+            $error = is_array($result) && is_string($result['error'] ?? null)
+                ? $result['error']
+                : 'Не удалось объединить части файла на удаленном проекте.';
+            throw new \RuntimeException($error);
+        }
+
+        return $sessionId;
     }
 
     /** @param mixed[] $config */
