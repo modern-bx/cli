@@ -107,14 +107,19 @@ php cli.phar setting:set cache.type '{"value":"memcache"}'
 php cli.phar setting:set --extra custom.flag true
 ```
 
-## `site:list [--remote=<codename>] [--filter=<json>] [--order=<json>] [--select=<json>]`
+## `site:list [--remote=<codename>] [--filter=<json>] [--order=<json>] [--select=<json>] [--pretty] [--short[=<format>]] [--format=<table|csv>]`
 
-Печатает сайты как JSON-строки через `Bitrix\Main\SiteTable::getList`. Опции напрямую соответствуют параметрам `filter`, `order`, `select`. С `--remote` выполняет D7-операцию на зарегистрированном удалённом проекте через PHP-консоль админки.
+Печатает сайты через `Bitrix\Main\SiteTable::getList`. По умолчанию выводит JSON-строки, с `--pretty` форматирует JSON. Опции `--short` и `--format` переключают вывод из JSON в строковый шаблон, консольную таблицу или CSV; они несовместимы между собой. Опции `filter`, `order`, `select` напрямую соответствуют параметрам D7. С `--remote` выполняет D7-операцию на зарегистрированном удалённом проекте через PHP-консоль админки.
 
 ```bash
 php cli.phar site:list
 php cli.phar site:list --filter='{"ACTIVE":"Y"}' --order='{"SORT":"ASC"}'
 php cli.phar site:list --remote=prod --select='["LID","NAME"]'
+php cli.phar site:list --pretty
+php cli.phar site:list --short
+php cli.phar site:list --short='[LID] NAME [SERVER_NAME]'
+php cli.phar site:list --format=table
+php cli.phar site:list --format=csv
 ```
 
 ## `site:get [--remote=<codename>] [--select=<json>] <id>`

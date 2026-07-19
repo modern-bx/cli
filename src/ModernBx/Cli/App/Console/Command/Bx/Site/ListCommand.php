@@ -17,6 +17,7 @@ use Symfony\Component\Console\Input\InputDefinition;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
+use Symfony\Component\Console\Helper\Table;
 
 use function ModernBx\CommonFunctions\to_json;
 
@@ -26,6 +27,8 @@ class ListCommand extends KernelCommand
     use RemotePhpTrait;
 
     private RemoteSitePhpCodeBuilder $remoteSitePhpCodeBuilder;
+
+    private ?OutputInterface $output = null;
 
     public function __construct(
         ClassAliasLoader $aliasLoader,
@@ -82,6 +85,19 @@ class ListCommand extends KernelCommand
                         InputOption::VALUE_NONE,
                         $this->trans("option.json.pretty_bx"),
                     ),
+                    new InputOption(
+                        'short',
+                        null,
+                        InputOption::VALUE_OPTIONAL,
+                        'Выводить сайты строками по шаблону (по умолчанию: [LID] NAME [SERVER_NAME])',
+                        false,
+                    ),
+                    new InputOption(
+                        'format',
+                        null,
+                        InputOption::VALUE_REQUIRED,
+                        'Формат вывода: table или csv',
+                    ),
                 ]),
             );
     }
@@ -94,6 +110,7 @@ class ListCommand extends KernelCommand
      */
     protected function executeInternal(InputInterface $input, OutputInterface $output): void
     {
+        $this->output = $output;
         $remote = $input->getOption('remote');
 
         if (is_string($remote)) {
@@ -134,13 +151,18 @@ class ListCommand extends KernelCommand
             $flags |= JSON_PRETTY_PRINT;
         }
 
+        $this->validateOutputOptions($input);
+
         /** @noinspection PhpUndefinedClassInspection */
         /** @phpstan-ignore-next-line */
         $cursor = \Bitrix\Main\SiteTable::getList($query);
 
+        $sites = [];
         while ($site = $cursor->fetch()) {
-            $this->printer->info((string) to_json($site, $flags));
+            $sites[] = $site;
         }
+
+        $this->renderSites($input, $sites, $flags);
     }
 
     protected function executeRemote(InputInterface $input, string $remote): void
@@ -170,8 +192,10 @@ class ListCommand extends KernelCommand
             $flags |= JSON_PRETTY_PRINT;
         }
 
+        $this->validateOutputOptions($input);
+
         $result = $this->decodeRemoteJsonResult(
-            $this->executeRemotePhp($remote, $this->remoteSitePhpCodeBuilder->buildList($query, $flags)),
+            $this->executeRemotePhp($remote, $this->remoteSitePhpCodeBuilder->buildList($query, 0)),
             'Не удалось получить список сайтов удаленного проекта.',
         );
 
@@ -179,9 +203,154 @@ class ListCommand extends KernelCommand
             throw new \RuntimeException('Удаленная PHP-консоль вернула некорректный список сайтов.');
         }
 
-        foreach ($result as $line) {
-            $this->printer->info(is_scalar($line) ? (string) $line : '');
+        $sites = [];
+        foreach ($result as $site) {
+            if (!is_array($site)) {
+                throw new \RuntimeException('Удаленная PHP-консоль вернула некорректный сайт.');
+            }
+            $sites[] = $site;
         }
+
+        $this->renderSites($input, $sites, $flags);
+    }
+
+    /** @param array<int, array<string, mixed>> $sites */
+    private function renderSites(InputInterface $input, array $sites, int $jsonFlags): void
+    {
+        $short = $input->getOption('short');
+        if ($short !== false) {
+            $template = is_string($short) && $short !== '' ? $short : '[LID] NAME [SERVER_NAME]';
+            foreach ($sites as $site) {
+                $this->printer->info($this->formatShortSite($site, $template));
+            }
+            return;
+        }
+
+        $format = $input->getOption('format');
+        if ($format === 'table') {
+            $this->renderTable($sites);
+            return;
+        }
+        if ($format === 'csv') {
+            $this->renderCsv($sites);
+            return;
+        }
+
+        foreach ($sites as $site) {
+            $this->printer->info((string) to_json($site, $jsonFlags));
+        }
+    }
+
+    private function validateOutputOptions(InputInterface $input): void
+    {
+        if ($input->getOption('short') !== false && $input->getOption('format') !== null) {
+            throw new \RuntimeException('Опции --short и --format несовместимы.', static::CODE_INVALID_OPTION_VALUE);
+        }
+
+        $format = $input->getOption('format');
+        if ($format !== null && !in_array($format, ['table', 'csv'], true)) {
+            throw new \RuntimeException(
+                'Опция --format поддерживает только значения table или csv.',
+                static::CODE_INVALID_OPTION_VALUE
+            );
+        }
+    }
+
+    /** @param array<string, mixed> $site */
+    private function formatShortSite(array $site, string $template): string
+    {
+        return (string) preg_replace_callback(
+            '/\[([A-Za-z0-9_]+)\]|\b([A-Z][A-Z0-9_]+)\b/',
+            static function (array $matches) use ($site): string {
+                $key = '';
+                foreach (array_slice($matches, 1) as $match) {
+                    if ($match !== '') {
+                        $key = $match;
+                        break;
+                    }
+                }
+                $value = $site[$key] ?? '';
+                if (is_scalar($value)) {
+                    return (string) $value;
+                }
+
+                $json = to_json($value);
+                return is_string($json) ? $json : '';
+            },
+            $template
+        );
+    }
+
+    /** @param array<int, array<string, mixed>> $sites */
+    private function renderTable(array $sites): void
+    {
+        $headers = $this->collectHeaders($sites);
+        $rows = [];
+        foreach ($sites as $site) {
+            $rows[] = array_map(
+                fn (string $header): string => $this->stringifyValue($site[$header] ?? ''),
+                $headers
+            );
+        }
+
+        (new Table($this->getOutput()))->setHeaders($headers)->setRows($rows)->render();
+    }
+
+    /** @param array<int, array<string, mixed>> $sites */
+    private function renderCsv(array $sites): void
+    {
+        $headers = $this->collectHeaders($sites);
+        $handle = fopen('php://temp', 'r+');
+        if ($handle === false) {
+            throw new \RuntimeException('Не удалось подготовить CSV-вывод.', static::CODE_IO_ERROR);
+        }
+
+        fputcsv($handle, $headers);
+        foreach ($sites as $site) {
+            fputcsv(
+                $handle,
+                array_map(fn (string $header): string => $this->stringifyValue($site[$header] ?? ''), $headers)
+            );
+        }
+        rewind($handle);
+        $csv = stream_get_contents($handle);
+        fclose($handle);
+        $this->getOutput()->write($csv === false ? '' : $csv);
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $sites
+     * @return array<int, string>
+     */
+    private function collectHeaders(array $sites): array
+    {
+        $headers = [];
+        foreach ($sites as $site) {
+            foreach (array_keys($site) as $key) {
+                if (!in_array((string) $key, $headers, true)) {
+                    $headers[] = (string) $key;
+                }
+            }
+        }
+        return $headers;
+    }
+
+    private function getOutput(): OutputInterface
+    {
+        if ($this->output === null) {
+            throw new \RuntimeException('Output is not initialized.');
+        }
+        return $this->output;
+    }
+
+    private function stringifyValue(mixed $value): string
+    {
+        if (is_scalar($value)) {
+            return (string) $value;
+        }
+
+        $json = to_json($value);
+        return is_string($json) ? $json : '';
     }
 
 
