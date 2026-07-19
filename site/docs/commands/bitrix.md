@@ -11,7 +11,7 @@ php cli.phar backup:extract ./backup.tar.gz ./restore
 php cli.phar backup:extract --password='secret' ./backup.enc.gz ./restore
 ```
 
-## `cache:clear [directory...]`
+## `cache:clear [--remote=<codename>] [directory...]`
 
 Очищает кеш Bitrix. Без аргументов удаляет содержимое стандартных каталогов:
 
@@ -19,11 +19,12 @@ php cli.phar backup:extract --password='secret' ./backup.enc.gz ./restore
 - `managed_cache`
 - `stack_cache`
 
-Можно передать один или несколько каталогов из допустимого списка.
+Можно передать один или несколько каталогов из допустимого списка. С `--remote` очистка выполняется на зарегистрированном удалённом проекте через PHP-консоль админки; корневые папки кеша сохраняются, удаляется только их содержимое. После выполнения выводится статистика по каждой папке; подробный список ошибок удаления печатается только при `--verbose`/`-v`.
 
 ```bash
 php cli.phar cache:clear
 php cli.phar cache:clear managed_cache
+php cli.phar cache:clear --remote=prod
 ```
 
 ## `module:install <module>`
