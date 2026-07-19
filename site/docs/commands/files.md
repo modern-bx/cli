@@ -34,6 +34,17 @@ php cli.phar file:put --remote=prod --force ./robots.txt robots.txt
 
 Опция `--force` удаляет удалённый файл перед загрузкой.
 
+## `file:apply [--remote=<codename>] [--force] [--yes] <directory src> <directory dest>`
+
+Воссоздаёт структуру локальной директории в директории назначения относительно document root локального или удалённого проекта и поштучно загружает файлы.
+
+Перед загрузкой команда проверяет конфликты через целевой проект: существующие директории выводятся как notice, существующие файлы — как ошибки. С опцией `--force` существующие файлы становятся notice и перезаписываются. Если после диагностики есть замечания, команда запросит подтверждение; опция `--yes` отключает запрос.
+
+```bash
+php cli.phar file:apply ./dist local/templates/site/assets
+php cli.phar file:apply --remote=prod --force --yes ./dist local/templates/site/assets
+```
+
 ## `file:mkdir [--remote=<codename>] <directory-path>`
 
 Создает директорию по пути относительно document root локального или удалённого проекта. Промежуточные директории в локальном режиме создаются автоматически.
