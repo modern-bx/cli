@@ -5,6 +5,7 @@ $directories = ['cache', 'managed_cache', 'stack_cache'];
 
 try {
     $errors = [];
+    $stats = [];
     $documentRoot = isset($_SERVER['DOCUMENT_ROOT']) && is_string($_SERVER['DOCUMENT_ROOT'])
         ? rtrim($_SERVER['DOCUMENT_ROOT'], '/\\')
         : '';
@@ -14,21 +15,43 @@ try {
     }
 
     $bxRoot = $documentRoot . '/bitrix';
+    $lastError = static function (): ?string {
+        $error = error_get_last();
 
-    $removePath = static function (string $path) use (&$removePath, &$errors): void {
+        return is_array($error) ? (string) $error['message'] : null;
+    };
+    $addError = static function (string $directory, string $path, ?string $reason) use (&$errors, &$stats): void {
+        $stats[$directory]['errors']++;
+        $errors[] = [
+            'directory' => $directory,
+            'path' => $path,
+            'reason' => $reason,
+        ];
+    };
+
+    $removePath = static function (
+        string $path,
+        string $directory
+    ) use (
+        &$removePath,
+        &$stats,
+        $addError,
+        $lastError
+    ): void {
         if (is_link($path) || is_file($path)) {
             if (!file_exists($path) && !is_link($path)) {
                 return;
             }
 
-            if (!@unlink($path)) {
-                $error = error_get_last();
-                $errors[] = [
-                    'path' => $path,
-                    'reason' => is_array($error) ? (string) $error['message'] : null,
-                ];
+            $size = @filesize($path);
+
+            if (@unlink($path)) {
+                $stats[$directory]['deleted_files']++;
+                $stats[$directory]['freed_bytes'] += is_int($size) ? $size : 0;
+                return;
             }
 
+            $addError($directory, $path, $lastError());
             return;
         }
 
@@ -39,11 +62,7 @@ try {
         $items = @scandir($path);
 
         if ($items === false) {
-            $error = error_get_last();
-            $errors[] = [
-                'path' => $path,
-                'reason' => is_array($error) ? (string) $error['message'] : null,
-            ];
+            $addError($directory, $path, $lastError());
             return;
         }
 
@@ -52,15 +71,11 @@ try {
                 continue;
             }
 
-            $removePath($path . DIRECTORY_SEPARATOR . $item);
+            $removePath($path . DIRECTORY_SEPARATOR . $item, $directory);
         }
 
         if (!@rmdir($path)) {
-            $error = error_get_last();
-            $errors[] = [
-                'path' => $path,
-                'reason' => is_array($error) ? (string) $error['message'] : null,
-            ];
+            $addError($directory, $path, $lastError());
         }
     };
 
@@ -69,6 +84,12 @@ try {
             throw new RuntimeException('Некорректная директория кеша.');
         }
 
+        $stats[$directory] = [
+            'directory' => $directory,
+            'deleted_files' => 0,
+            'freed_bytes' => 0,
+            'errors' => 0,
+        ];
         $path = $bxRoot . '/' . $directory;
 
         if (!is_dir($path)) {
@@ -78,11 +99,7 @@ try {
         $items = @scandir($path);
 
         if ($items === false) {
-            $error = error_get_last();
-            $errors[] = [
-                'path' => $path,
-                'reason' => is_array($error) ? (string) $error['message'] : null,
-            ];
+            $addError($directory, $path, $lastError());
             continue;
         }
 
@@ -91,16 +108,16 @@ try {
                 continue;
             }
 
-            $removePath($path . DIRECTORY_SEPARATOR . $item);
+            $removePath($path . DIRECTORY_SEPARATOR . $item, $directory);
         }
     }
 
     if ($errors !== []) {
-        echo CommandResult::error('Не удалось удалить часть файлов кеша.', $errors);
+        echo CommandResult::error('Не удалось удалить часть файлов кеша.', $errors, $stats);
         return;
     }
 
-    echo CommandResult::success(true);
+    echo CommandResult::success($stats);
 } catch (Throwable $err) {
     echo CommandResult::error($err->getMessage());
 }

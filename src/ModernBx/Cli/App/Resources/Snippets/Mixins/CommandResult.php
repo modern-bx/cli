@@ -19,7 +19,7 @@ final class CommandResult
     }
 
     /** @param array<int, mixed> $additionalErrors */
-    public static function error(string $error, array $additionalErrors = []): string
+    public static function error(string $error, array $additionalErrors = [], mixed $result = null): string
     {
         $payload = [
             'ok' => false,
@@ -28,6 +28,10 @@ final class CommandResult
 
         if ($additionalErrors !== []) {
             $payload['errors'] = $additionalErrors;
+        }
+
+        if ($result !== null) {
+            $payload['result'] = $result;
         }
 
         return self::encode($payload);

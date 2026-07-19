@@ -88,16 +88,19 @@ class ClearCommand extends BxCommand
 
         parent::executeInternal($input, $output);
 
+        $stats = [];
         $errors = [];
 
         foreach ($directories as $directory) {
+            $stats[$directory] = $this->createEmptyStats($directory);
             $path = $this->bxRoot->pushPathSegment($directory)->toString();
 
             if (file_exists($path) && is_dir($path)) {
-                array_push($errors, ...$this->collectDeleteDirectoryContentErrors($path));
+                $this->clearDirectoryContent($path, $directory, $stats[$directory], $errors);
             }
         }
 
+        $this->printStats($stats);
         $this->throwIfDeleteErrors($errors);
     }
 
@@ -109,6 +112,10 @@ class ClearCommand extends BxCommand
 
         if (!is_array($result)) {
             throw new \RuntimeException('Удаленная PHP-консоль вернула некорректный JSON.');
+        }
+
+        if (isset($result['result']) && is_array($result['result'])) {
+            $this->printStats($result['result']);
         }
 
         if (($result['ok'] ?? false) === true) {
@@ -124,6 +131,139 @@ class ClearCommand extends BxCommand
         throw new \RuntimeException(is_string($error) ? $error : 'Не удалось очистить кеш удаленного проекта.');
     }
 
+    /**
+     * @param array{directory: string, deleted_files: int, freed_bytes: int, errors: int} $stats
+     * @param array<int, array{path: string, reason: string|null, directory: string}> $errors
+     */
+    protected function clearDirectoryContent(string $path, string $directory, array &$stats, array &$errors): void
+    {
+        $items = @scandir($path);
+
+        if ($items === false) {
+            $this->addDeleteError($errors, $stats, $path, $this->getLastPhpErrorMessage(), $directory);
+            return;
+        }
+
+        foreach ($items as $item) {
+            if ($item === '.' || $item === '..') {
+                continue;
+            }
+
+            $this->deletePath($path . DIRECTORY_SEPARATOR . $item, $directory, $stats, $errors);
+        }
+    }
+
+    /**
+     * @param array{directory: string, deleted_files: int, freed_bytes: int, errors: int} $stats
+     * @param array<int, array{path: string, reason: string|null, directory: string}> $errors
+     */
+    protected function deletePath(string $path, string $directory, array &$stats, array &$errors): void
+    {
+        if (is_link($path) || is_file($path)) {
+            if (!file_exists($path) && !is_link($path)) {
+                return;
+            }
+
+            $size = @filesize($path);
+
+            if (@unlink($path)) {
+                $stats['deleted_files']++;
+                $stats['freed_bytes'] += is_int($size) ? $size : 0;
+                return;
+            }
+
+            $this->addDeleteError($errors, $stats, $path, $this->getLastPhpErrorMessage(), $directory);
+            return;
+        }
+
+        if (!is_dir($path)) {
+            return;
+        }
+
+        $this->clearDirectoryContent($path, $directory, $stats, $errors);
+
+        if (!@rmdir($path)) {
+            $this->addDeleteError($errors, $stats, $path, $this->getLastPhpErrorMessage(), $directory);
+        }
+    }
+
+    /** @return array{directory: string, deleted_files: int, freed_bytes: int, errors: int} */
+    protected function createEmptyStats(string $directory): array
+    {
+        return [
+            'directory' => $directory,
+            'deleted_files' => 0,
+            'freed_bytes' => 0,
+            'errors' => 0,
+        ];
+    }
+
+    /**
+     * @param array<int, array{path: string, reason: string|null, directory: string}> $errors
+     * @param array{directory: string, deleted_files: int, freed_bytes: int, errors: int} $stats
+     */
+    protected function addDeleteError(
+        array &$errors,
+        array &$stats,
+        string $path,
+        ?string $reason,
+        string $directory
+    ): void {
+        $stats['errors']++;
+        $errors[] = [
+            'path' => $path,
+            'reason' => $reason,
+            'directory' => $directory,
+        ];
+    }
+
+    /** @param array<string, mixed> $stats */
+    protected function printStats(array $stats): void
+    {
+        foreach ($stats as $directory => $item) {
+            if (!is_array($item)) {
+                $item = [];
+            }
+
+            $name = isset($item['directory']) && is_string($item['directory'])
+                ? $item['directory']
+                : (string) $directory;
+            $deletedFiles = isset($item['deleted_files']) && is_numeric($item['deleted_files'])
+                ? (int) $item['deleted_files']
+                : 0;
+            $freedBytes = isset($item['freed_bytes']) && is_numeric($item['freed_bytes'])
+                ? (int) $item['freed_bytes']
+                : 0;
+            $errors = isset($item['errors']) && is_numeric($item['errors']) ? (int) $item['errors'] : 0;
+
+            $this->printer->info(sprintf(
+                '%s: удалено файлов: %d, освобождено: %s, ошибок: %d',
+                $name,
+                $deletedFiles,
+                $this->formatBytes($freedBytes),
+                $errors,
+            ));
+        }
+    }
+
+    protected function formatBytes(int $bytes): string
+    {
+        $mb = $bytes / 1024 / 1024;
+
+        if ($mb >= 1024) {
+            return sprintf('%.2f Гб', $mb / 1024);
+        }
+
+        return sprintf('%.2f Мб', $mb);
+    }
+
+    protected function getLastPhpErrorMessage(): ?string
+    {
+        $error = error_get_last();
+
+        return is_array($error) ? (string) $error['message'] : null;
+    }
+
     /** @param array<int, mixed> $errors */
     protected function throwIfDeleteErrors(array $errors): void
     {
@@ -131,17 +271,19 @@ class ClearCommand extends BxCommand
             return;
         }
 
-        foreach ($errors as $item) {
-            if (!is_array($item)) {
-                continue;
+        if ($this->isVerbose()) {
+            foreach ($errors as $item) {
+                if (!is_array($item)) {
+                    continue;
+                }
+
+                $path = isset($item['path']) && is_string($item['path']) ? $item['path'] : 'unknown';
+                $reason = isset($item['reason']) && is_string($item['reason']) && $item['reason'] !== ''
+                    ? $item['reason']
+                    : 'причина неизвестна';
+
+                $this->printer->error(sprintf('Ошибка удаления (%s): %s', $reason, $path));
             }
-
-            $path = isset($item['path']) && is_string($item['path']) ? $item['path'] : 'unknown';
-            $reason = isset($item['reason']) && is_string($item['reason']) && $item['reason'] !== ''
-                ? $item['reason']
-                : 'причина неизвестна';
-
-            $this->printer->error(sprintf('Ошибка удаления (%s): %s', $reason, $path));
         }
 
         throw new \RuntimeException('Не удалось удалить часть файлов кеша.', static::CODE_IO_ERROR);
