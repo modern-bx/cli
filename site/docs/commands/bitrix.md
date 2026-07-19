@@ -65,7 +65,7 @@ php cli.phar module:reinstall vendor.module
 php cli.phar module:version main sale vendor.module
 ```
 
-## `option:get [--remote <name>] [--local] [--unserialize] <option...>`
+## `option:get [--remote <name>] [--local] [--unserialize] <option>`
 
 Читает опции модулей. Формат аргумента:
 
@@ -89,6 +89,15 @@ php cli.phar option:get --remote prod main.site_name
 php cli.phar option:set main.site_name 'Новый сайт'
 php cli.phar option:set main.some_option.s1 value
 php cli.phar option:set --remote prod main.site_name 'Новый сайт'
+```
+
+## `option:delete [--remote <name>] [--local] <option>`
+
+Удаляет опцию Bitrix. Формат имени такой же, как у `option:get`. Опция `--remote` выполняет удаление через административную PHP-консоль зарегистрированного удалённого проекта, а `--local` отключает неявный remote текущей сессии.
+
+```bash
+php cli.phar option:delete main.site_name
+php cli.phar option:delete --remote prod main.site_name
 ```
 
 ## `setting:get [--extra] [--pretty] <path>`

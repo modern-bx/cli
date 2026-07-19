@@ -10,11 +10,10 @@ final class RemoteOptionPhpCodeBuilder
 
     private const SNIPPET_DIR = __DIR__ . '/../../Resources/Snippets';
 
-    /** @param string[] $options */
-    public function buildGet(array $options, bool $unserialize): string
+    public function buildGet(string $option, bool $unserialize): string
     {
         return $this->build('remote_option_get.php', [
-            '$options = [];' => '$options = ' . var_export(array_values($options), true) . ';',
+            "\$option = '__BX_CLI_OPTION__';" => '$option = ' . var_export($option, true) . ';',
             '$unserialize = false;' => '$unserialize = ' . ($unserialize ? 'true' : 'false') . ';',
         ]);
     }
@@ -24,6 +23,13 @@ final class RemoteOptionPhpCodeBuilder
         return $this->build('remote_option_set.php', [
             "\$option = '__BX_CLI_OPTION__';" => '$option = ' . var_export($option, true) . ';',
             "\$value = '__BX_CLI_VALUE__';" => '$value = ' . var_export($value, true) . ';',
+        ]);
+    }
+
+    public function buildDelete(string $option): string
+    {
+        return $this->build('remote_option_delete.php', [
+            "\$option = '__BX_CLI_OPTION__';" => '$option = ' . var_export($option, true) . ';',
         ]);
     }
 

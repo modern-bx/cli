@@ -1,52 +1,48 @@
 <?php
 
-/** @var string[] $options Список имен опций в формате module.option.siteId. */
-$options = [];
+/** @var string $option Имя опции в формате module.option.siteId. */
+$option = '__BX_CLI_OPTION__';
 
 /** @var bool $unserialize Нужно ли распаковать сериализованное значение. */
 $unserialize = false;
 
 try {
-    if (!is_array($options)) {
-        throw new RuntimeException('Список опций должен быть массивом.');
+    if (!is_string($option) || $option === '') {
+        throw new RuntimeException('Имя опции должно быть непустой строкой.');
     }
+
+    $parts = explode('.', $option);
+
+    if (count($parts) < 2 || count($parts) > 3 || in_array('', $parts, true)) {
+        throw new RuntimeException('Имя опции должно быть в формате module.option[.lid].');
+    }
+
+    [$moduleName, $optionName] = $parts;
+    $siteId = $parts[2] ?? null;
 
     if (!class_exists('\Bitrix\Main\Config\Option')) {
         throw new RuntimeException('D7-класс Bitrix\\Main\\Config\\Option недоступен на удаленном проекте.');
     }
 
-    $lines = [];
+    $optionValue = \Bitrix\Main\Config\Option::get(
+        $moduleName,
+        $optionName,
+        '',
+        $siteId !== null ? $siteId : false
+    );
 
-    foreach ($options as $option) {
-        if (!is_string($option) || $option === '') {
-            throw new RuntimeException('Имя опции должно быть непустой строкой.');
-        }
+    if ($unserialize) {
+        $unserializedValue = @unserialize($optionValue);
+    }
 
-        [$moduleName, $optionName, $siteId] = explode('.', $option);
+    $line = json_encode($unserializedValue ?? $optionValue, JSON_UNESCAPED_UNICODE);
 
-        $optionValue = \Bitrix\Main\Config\Option::get(
-            $moduleName,
-            $optionName,
-            '',
-            $siteId ?: false
-        );
-
-        if ($unserialize) {
-            $unserializedValue = @unserialize($optionValue);
-        }
-
-        $line = json_encode($unserializedValue ?? $optionValue, JSON_UNESCAPED_UNICODE);
-
-        if (!is_string($line)) {
-            throw new RuntimeException('Не удалось сериализовать опцию в JSON.');
-        }
-
-        $lines[] = $line;
-        unset($unserializedValue);
+    if (!is_string($line)) {
+        throw new RuntimeException('Не удалось сериализовать опцию в JSON.');
     }
 
     /** @phpstan-ignore-next-line */
-    echo CommandResult::success($lines);
+    echo CommandResult::success($line);
 } catch (Throwable $err) {
     /** @phpstan-ignore-next-line */
     echo CommandResult::error($err->getMessage());

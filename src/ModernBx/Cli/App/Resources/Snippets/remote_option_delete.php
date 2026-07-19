@@ -3,9 +3,6 @@
 /** @var string $option Имя опции в формате module.option.siteId. */
 $option = '__BX_CLI_OPTION__';
 
-/** @var string $value Новое значение опции. */
-$value = '__BX_CLI_VALUE__';
-
 try {
     $parts = explode('.', $option);
 
@@ -20,11 +17,12 @@ try {
         throw new RuntimeException('D7-класс Bitrix\\Main\\Config\\Option недоступен на удаленном проекте.');
     }
 
-    \Bitrix\Main\Config\Option::set(
+    \Bitrix\Main\Config\Option::delete(
         $moduleName,
-        $optionName,
-        $value,
-        $siteId ?? ''
+        [
+            'name' => $optionName,
+            'site_id' => $siteId ?? '',
+        ]
     );
 
     /** @phpstan-ignore-next-line */

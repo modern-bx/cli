@@ -100,7 +100,7 @@ class SetCommand extends KernelCommand
         $option = $input->getArgument("option");
         /** @var string $value */
         $value = $input->getArgument("value");
-        [$moduleName, $optionName, $siteId] = explode(".", $option);
+        [$moduleName, $optionName, $siteId] = $this->parseOptionName($option);
 
         /** @noinspection PhpUndefinedClassInspection */
         /** @noinspection PhpUndefinedNamespaceInspection */
@@ -110,7 +110,7 @@ class SetCommand extends KernelCommand
             $moduleName,
             $optionName,
             $value,
-            $siteId ?: "",
+            $siteId ?? "",
         );
     }
 
@@ -131,5 +131,19 @@ class SetCommand extends KernelCommand
             ),
             'Не удалось обновить опцию удаленного проекта.',
         );
+    }
+
+    /**
+     * @return array{0: string, 1: string, 2: string|null}
+     */
+    private function parseOptionName(string $option): array
+    {
+        $parts = explode(".", $option);
+
+        if (count($parts) < 2 || count($parts) > 3 || in_array('', $parts, true)) {
+            throw new \InvalidArgumentException('Имя опции должно быть в формате module.option[.lid].');
+        }
+
+        return [$parts[0], $parts[1], $parts[2] ?? null];
     }
 }
