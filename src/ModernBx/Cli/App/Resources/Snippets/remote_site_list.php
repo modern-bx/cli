@@ -26,21 +26,15 @@ try {
     }
 
     $cursor = \Bitrix\Main\SiteTable::getList($query);
-    $lines = [];
+    $sites = [];
 
     while ($site = $cursor->fetch()) {
-        $line = json_encode($site, $jsonFlags);
-
-        if (!is_string($line)) {
-            throw new \RuntimeException('Не удалось сериализовать сайт в JSON.');
-        }
-
-        $lines[] = $line;
+        $sites[] = $site;
     }
 
     echo json_encode([
         'ok' => true,
-        'result' => $lines,
+        'result' => $sites,
     ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 } catch (\Throwable $err) {
     echo json_encode([

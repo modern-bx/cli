@@ -78,6 +78,19 @@ _bx_cli_options()
     } | sort -u
 }
 
+_bx_cli_remotes()
+{
+    "${COMP_WORDS[0]}" remote:list 2>/dev/null
+}
+
+_bx_cli_previous_word()
+{
+    local index=$((COMP_CWORD - 1))
+    if [[ "$index" -ge 0 ]]; then
+        printf '%s' "${COMP_WORDS[$index]}"
+    fi
+}
+
 _bx_cli()
 {
     local cur cword
@@ -87,6 +100,22 @@ _bx_cli()
 
     if [[ "$cword" -eq 1 ]]; then
         mapfile -t COMPREPLY < <(compgen -W "$(_bx_cli_commands)" -- "$cur")
+        return 0
+    fi
+
+    if [[ "$cur" == --remote=* ]]; then
+        mapfile -t COMPREPLY < <(compgen -W "$(_bx_cli_remotes)" -- "${cur#--remote=}")
+        COMPREPLY=("${COMPREPLY[@]/#/--remote=}")
+        return 0
+    fi
+
+    if [[ "$(_bx_cli_previous_word)" == --remote ]]; then
+        mapfile -t COMPREPLY < <(compgen -W "$(_bx_cli_remotes)" -- "$cur")
+        return 0
+    fi
+
+    if [[ "${COMP_WORDS[1]}" == session:remote || "${COMP_WORDS[1]}" == remote:delete ]]; then
+        mapfile -t COMPREPLY < <(compgen -W "$(_bx_cli_remotes)" -- "$cur")
         return 0
     fi
 
