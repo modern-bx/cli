@@ -18,12 +18,19 @@ final class CommandResult
         return self::encode(array_merge(['ok' => true], $data));
     }
 
-    public static function error(string $error): string
+    /** @param array<int, mixed> $additionalErrors */
+    public static function error(string $error, array $additionalErrors = []): string
     {
-        return self::encode([
+        $payload = [
             'ok' => false,
             'error' => $error,
-        ]);
+        ];
+
+        if ($additionalErrors !== []) {
+            $payload['errors'] = $additionalErrors;
+        }
+
+        return self::encode($payload);
     }
 
     /** @param array<string, mixed> $payload */
