@@ -89,7 +89,7 @@ class ListCommand extends KernelCommand
                         'short',
                         null,
                         InputOption::VALUE_OPTIONAL,
-                        'Выводить сайты строками по шаблону (по умолчанию: [LID] NAME [SERVER_NAME])',
+                        'Выводить сайты строками по шаблону (по умолчанию: [$LID] $NAME [$SERVER_NAME])',
                         false,
                     ),
                     new InputOption(
@@ -219,7 +219,7 @@ class ListCommand extends KernelCommand
     {
         $short = $input->getOption('short');
         if ($short !== false) {
-            $template = is_string($short) && $short !== '' ? $short : '[LID] NAME [SERVER_NAME]';
+            $template = is_string($short) && $short !== '' ? $short : '[$LID] $NAME [$SERVER_NAME]';
             foreach ($sites as $site) {
                 $this->printer->info($this->formatShortSite($site, $template));
             }
@@ -260,22 +260,13 @@ class ListCommand extends KernelCommand
     private function formatShortSite(array $site, string $template): string
     {
         return (string) preg_replace_callback(
-            '/\[([A-Za-z0-9_]+)\]|\b([A-Z][A-Z0-9_]+)\b/',
-            static function (array $matches) use ($site): string {
-                $key = '';
-                foreach (array_slice($matches, 1) as $match) {
-                    if ($match !== '') {
-                        $key = $match;
-                        break;
-                    }
-                }
+            '/\$([A-Za-z_][A-Za-z0-9_]*)/',
+            function (array $matches) use ($site): string {
+                $key = $matches[1];
                 $value = $site[$key] ?? '';
-                if (is_scalar($value)) {
-                    return (string) $value;
-                }
+                $formatted = $this->stringifyValue($value);
 
-                $json = to_json($value);
-                return is_string($json) ? $json : '';
+                return $key === 'SERVER_NAME' ? $this->formatServerNameLink($formatted) : $formatted;
             },
             $template
         );
@@ -333,6 +324,17 @@ class ListCommand extends KernelCommand
             }
         }
         return $headers;
+    }
+
+    private function formatServerNameLink(string $serverName): string
+    {
+        if ($serverName === '') {
+            return '';
+        }
+
+        $url = str_starts_with($serverName, 'https://') ? $serverName : 'https://' . $serverName;
+
+        return sprintf('<href=%s>%s</>', $url, $serverName);
     }
 
     private function getOutput(): OutputInterface
