@@ -8,6 +8,11 @@ namespace ModernBx\Cli\App\Console\Command\Bx\Option;
 
 use ModernBx\Cli\App\Console\Command\Bx\KernelCommand;
 use ModernBx\Cli\App\Console\Mixin\Common\IO;
+use ModernBx\Cli\App\Service\ClassAliasLoader;
+use ModernBx\Cli\App\Service\Remote\BitrixAdminClient;
+use ModernBx\Cli\App\Service\Remote\RemoteOptionPhpCodeBuilder;
+use ModernBx\Cli\App\Service\Remote\RemotePhpTrait;
+use ModernBx\Cli\App\Service\Remote\RemoteProjectConfigManager;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputDefinition;
 use Symfony\Component\Console\Input\InputInterface;
@@ -19,6 +24,22 @@ use function ModernBx\CommonFunctions\to_json;
 class GetCommand extends KernelCommand
 {
     use IO;
+    use RemotePhpTrait;
+
+    private RemoteOptionPhpCodeBuilder $remoteOptionPhpCodeBuilder;
+
+    public function __construct(
+        ClassAliasLoader $aliasLoader,
+        RemoteProjectConfigManager $remoteProjectConfigManager,
+        BitrixAdminClient $bitrixAdminClient,
+        RemoteOptionPhpCodeBuilder $remoteOptionPhpCodeBuilder
+    ) {
+        parent::__construct($aliasLoader);
+
+        $this->remoteProjectConfigManager = $remoteProjectConfigManager;
+        $this->bitrixAdminClient = $bitrixAdminClient;
+        $this->remoteOptionPhpCodeBuilder = $remoteOptionPhpCodeBuilder;
+    }
 
     /**
      * @var string
@@ -32,6 +53,18 @@ class GetCommand extends KernelCommand
             ->setHelp($this->trans("command.option_get.help"))
             ->setDefinition(
                 new InputDefinition([
+                    new InputOption(
+                        'remote',
+                        null,
+                        InputOption::VALUE_REQUIRED,
+                        'Кодовое имя удаленного проекта',
+                    ),
+                    new InputOption(
+                        'local',
+                        null,
+                        InputOption::VALUE_NONE,
+                        'Отключить неявный remote текущей сессии',
+                    ),
                     new InputOption(
                         'unserialize',
                         'u',
@@ -55,6 +88,15 @@ class GetCommand extends KernelCommand
      */
     protected function executeInternal(InputInterface $input, OutputInterface $output): void
     {
+        $remote = $input->getOption('remote');
+
+        if (is_string($remote)) {
+            $this->printer = $this->getPrinter($output);
+            $this->verbose = $input->getOption('verbose') !== false;
+            $this->executeRemote($input, $remote);
+            return;
+        }
+
         parent::executeInternal($input, $output);
 
         /** @var array<string> $optionList */
@@ -79,6 +121,31 @@ class GetCommand extends KernelCommand
             }
 
             $this->printer->info((string) to_json($unserializedValue ?? $optionValue));
+        }
+    }
+
+    /**
+     * @throws \Exception
+     */
+    protected function executeRemote(InputInterface $input, string $remote): void
+    {
+        /** @var array<string> $optionList */
+        $optionList = $input->getArgument("option");
+
+        $lines = $this->decodeRemoteJsonResult(
+            $this->executeRemotePhp(
+                $remote,
+                $this->remoteOptionPhpCodeBuilder->buildGet($optionList, (bool) $input->getOption("unserialize"))
+            ),
+            'Не удалось получить опцию удаленного проекта.',
+        );
+
+        if (!is_array($lines)) {
+            throw new \RuntimeException('Удаленная PHP-консоль вернула некорректный результат получения опций.');
+        }
+
+        foreach ($lines as $line) {
+            $this->printer->info(is_scalar($line) ? (string) $line : '');
         }
     }
 }
