@@ -24,12 +24,18 @@ try {
         throw new RuntimeException('D7-класс Bitrix\\Main\\Config\\Option недоступен на удаленном проекте.');
     }
 
+    $defaultValue = "\0BX_CLI_OPTION_NOT_FOUND\0";
+
     $optionValue = \Bitrix\Main\Config\Option::get(
         $moduleName,
         $optionName,
-        '',
+        $defaultValue,
         $siteId !== null ? $siteId : false
     );
+
+    if ($optionValue === $defaultValue) {
+        throw new RuntimeException(sprintf('Опция %s не найдена в бд.', $option));
+    }
 
     if ($unserialize) {
         $unserializedValue = @unserialize($optionValue);

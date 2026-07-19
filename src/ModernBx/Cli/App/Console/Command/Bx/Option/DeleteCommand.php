@@ -95,6 +95,24 @@ class DeleteCommand extends KernelCommand
         $option = $input->getArgument("option");
         [$moduleName, $optionName, $siteId] = $this->parseOptionName($option);
 
+        $defaultValue = "\0BX_CLI_OPTION_NOT_FOUND\0";
+
+        /** @noinspection PhpUndefinedClassInspection */
+        /** @noinspection PhpUndefinedNamespaceInspection */
+        /** @var string $optionValue */
+        /** @phpstan-ignore-next-line */
+        $optionValue = \Bitrix\Main\Config\Option::get(
+            $moduleName,
+            $optionName,
+            $defaultValue,
+            $siteId !== null ? $siteId : false,
+        );
+
+        if ($optionValue === $defaultValue) {
+            $this->printer->put($this->getOptionNotFoundMessage($option), "comment");
+            return;
+        }
+
         /** @noinspection PhpUndefinedClassInspection */
         /** @noinspection PhpUndefinedNamespaceInspection */
         /** @phpstan-ignore-next-line */
@@ -115,13 +133,22 @@ class DeleteCommand extends KernelCommand
         /** @var string $option */
         $option = $input->getArgument("option");
 
-        $this->decodeRemoteJsonResult(
+        $result = $this->decodeRemoteJsonResult(
             $this->executeRemotePhp(
                 $remote,
                 $this->remoteOptionPhpCodeBuilder->buildDelete($option)
             ),
             'Не удалось удалить опцию удаленного проекта.',
         );
+
+        if (is_array($result) && ($result['warning'] ?? null) === 'OPTION_NOT_FOUND') {
+            $this->printer->put($this->getOptionNotFoundMessage($option), "comment");
+        }
+    }
+
+    private function getOptionNotFoundMessage(string $option): string
+    {
+        return sprintf('Опция %s не найдена в бд.', $option);
     }
 
     /**

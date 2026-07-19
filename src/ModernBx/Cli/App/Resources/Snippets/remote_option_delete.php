@@ -17,6 +17,21 @@ try {
         throw new RuntimeException('D7-класс Bitrix\\Main\\Config\\Option недоступен на удаленном проекте.');
     }
 
+    $defaultValue = "\0BX_CLI_OPTION_NOT_FOUND\0";
+
+    $optionValue = \Bitrix\Main\Config\Option::get(
+        $moduleName,
+        $optionName,
+        $defaultValue,
+        $siteId !== null ? $siteId : false
+    );
+
+    if ($optionValue === $defaultValue) {
+        /** @phpstan-ignore-next-line */
+        echo CommandResult::success(['warning' => 'OPTION_NOT_FOUND']);
+        return;
+    }
+
     \Bitrix\Main\Config\Option::delete(
         $moduleName,
         [

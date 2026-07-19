@@ -103,6 +103,8 @@ class GetCommand extends KernelCommand
         $option = $input->getArgument("option");
         [$moduleName, $optionName, $siteId] = $this->parseOptionName($option);
 
+        $defaultValue = "\0BX_CLI_OPTION_NOT_FOUND\0";
+
         /** @noinspection PhpUndefinedClassInspection */
         /** @noinspection PhpUndefinedNamespaceInspection */
         /** @var string $optionValue */
@@ -110,9 +112,13 @@ class GetCommand extends KernelCommand
         $optionValue = \Bitrix\Main\Config\Option::get(
             $moduleName,
             $optionName,
-            "",
+            $defaultValue,
             $siteId !== null ? $siteId : false,
         );
+
+        if ($optionValue === $defaultValue) {
+            throw new \RuntimeException($this->getOptionNotFoundMessage($option));
+        }
 
         if ($input->getOption("unserialize")) {
             $unserializedValue = @unserialize($optionValue);
@@ -138,6 +144,11 @@ class GetCommand extends KernelCommand
         );
 
         $this->printer->info($this->formatOptionValue($line));
+    }
+
+    private function getOptionNotFoundMessage(string $option): string
+    {
+        return sprintf('Опция %s не найдена в бд.', $option);
     }
 
     private function formatOptionValue(mixed $value): string
