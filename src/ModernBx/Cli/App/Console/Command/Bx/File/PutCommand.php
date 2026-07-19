@@ -43,6 +43,7 @@ class PutCommand extends AppCommand
             ->addOption('remote', null, InputOption::VALUE_REQUIRED, 'Кодовое имя удаленного проекта')
             ->addOption('local', null, InputOption::VALUE_NONE, 'Отключить неявный remote текущей сессии')
             ->addOption('force', null, InputOption::VALUE_NONE, 'Удалить удаленный файл перед загрузкой')
+            ->addOption('chunk-size', null, InputOption::VALUE_REQUIRED, 'Размер части файла в байтах')
             ->addArgument('src', InputArgument::REQUIRED, 'Путь к локальному файлу')
             ->addArgument('dest', InputArgument::REQUIRED, 'Удаленный путь относительно document root проекта');
     }
@@ -67,8 +68,16 @@ class PutCommand extends AppCommand
         }
 
         $src = $this->resolveSourcePath($srcArgument);
+        $chunkSize = $this->resolveChunkSizeOption($input);
         [$remoteDirectory, $filename] = $this->resolveRemoteDestination($destArgument, basename($src));
-        $this->executeRemote($remote, $src, $remoteDirectory, $filename, $input->getOption('force') === true);
+        $this->executeRemote(
+            $remote,
+            $src,
+            $remoteDirectory,
+            $filename,
+            $input->getOption('force') === true,
+            $chunkSize,
+        );
     }
 
     protected function executeRemote(
@@ -76,7 +85,8 @@ class PutCommand extends AppCommand
         string $src,
         string $remoteDirectory,
         string $filename,
-        bool $force
+        bool $force,
+        ?int $chunkSizeOverride
     ): void {
         $config = $this->remoteProjectConfigManager->load($codename);
         $endpoint = $this->remoteProjectConfigManager->getEndpoint($config);
@@ -107,7 +117,9 @@ class PutCommand extends AppCommand
             }
         }
 
-        if ($this->shouldUploadInChunks($size, $limits['max_post_file_bytes'])) {
+        $chunkSize = $this->resolveUploadChunkSize($limits['max_post_file_bytes'], $chunkSizeOverride);
+
+        if ($chunkSize !== null && $size > $chunkSize) {
             $sessionId = $this->uploadFileInChunks(
                 $codename,
                 $config,
@@ -117,7 +129,7 @@ class PutCommand extends AppCommand
                 $size,
                 $remoteDirectory,
                 $filename,
-                $limits['max_post_file_bytes'],
+                $chunkSize,
             );
         } else {
             try {
@@ -158,13 +170,16 @@ class PutCommand extends AppCommand
         }
     }
 
-    protected function shouldUploadInChunks(int $size, int $limit): bool
+    protected function resolveUploadChunkSize(int $limit, ?int $chunkSizeOverride): ?int
     {
-        return $limit > 0 && $size > $this->getChunkSize($limit);
-    }
+        if ($chunkSizeOverride !== null) {
+            return $chunkSizeOverride;
+        }
 
-    protected function getChunkSize(int $limit): int
-    {
+        if ($limit <= 0) {
+            return null;
+        }
+
         $reserve = max(65536, (int) ceil($limit * 0.05));
         $chunkSize = $limit - $reserve;
 
@@ -188,9 +203,8 @@ class PutCommand extends AppCommand
         int $size,
         string $remoteDirectory,
         string $filename,
-        int $limit
+        int $chunkSize
     ): string {
-        $chunkSize = $this->getChunkSize($limit);
         $chunkCount = (int) ceil($size / $chunkSize);
         $prefix = '.' . $filename . '.upload-' . bin2hex(random_bytes(8));
         $remoteChunks = [];
@@ -236,10 +250,11 @@ class PutCommand extends AppCommand
                 $sent = min($size, $index * $chunkSize);
                 $percent = $size === 0 ? 100 : (int) floor($sent * 100 / $size);
                 $this->printer->info(sprintf(
-                    'Отправлена часть %d/%d (%d байт, %d%%).',
+                    'Отправлена часть %d/%d (~%s из ~%s, %d%%).',
                     $index,
                     $chunkCount,
-                    $sent,
+                    $this->formatBytes($sent),
+                    $this->formatBytes($size),
                     $percent,
                 ));
             }
@@ -375,6 +390,25 @@ class PutCommand extends AppCommand
                 throw $err;
             }
         }
+    }
+
+
+    protected function resolveChunkSizeOption(InputInterface $input): ?int
+    {
+        $value = $input->getOption('chunk-size');
+
+        if ($value === null || $value === false || $value === '') {
+            return null;
+        }
+
+        if (!is_string($value) || !ctype_digit($value) || (int) $value < 1) {
+            throw new \RuntimeException(
+                'Опция --chunk-size должна быть положительным целым числом байт.',
+                static::CODE_INVALID_OPTION_VALUE,
+            );
+        }
+
+        return (int) $value;
     }
 
     protected function resolveSourcePath(string $path): string
