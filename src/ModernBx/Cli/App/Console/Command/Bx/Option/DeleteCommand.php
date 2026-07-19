@@ -19,9 +19,7 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 
-use function ModernBx\CommonFunctions\to_json;
-
-class GetCommand extends KernelCommand
+class DeleteCommand extends KernelCommand
 {
     use IO;
     use RemotePhpTrait;
@@ -44,13 +42,13 @@ class GetCommand extends KernelCommand
     /**
      * @var string
      */
-    protected static $defaultName = 'option:get';
+    protected static $defaultName = 'option:delete';
 
     protected function configure(): void
     {
         $this
-            ->setDescription($this->trans("command.option_get.description"))
-            ->setHelp($this->trans("command.option_get.help"))
+            ->setDescription('Удаляет опцию Bitrix')
+            ->setHelp('Удаляет опцию Bitrix. Формат имени: module.option[.lid].')
             ->setDefinition(
                 new InputDefinition([
                     new InputOption(
@@ -65,18 +63,12 @@ class GetCommand extends KernelCommand
                         InputOption::VALUE_NONE,
                         'Отключить неявный remote текущей сессии',
                     ),
-                    new InputOption(
-                        'unserialize',
-                        'u',
-                        InputOption::VALUE_NONE,
-                        $this->trans("option.option.unserialize"),
-                    ),
                     new InputArgument(
                         'option',
                         InputArgument::REQUIRED,
                         $this->trans("argument.option.name"),
                     ),
-                ]),
+                ])
             );
     }
 
@@ -117,14 +109,20 @@ class GetCommand extends KernelCommand
         );
 
         if ($optionValue === $defaultValue) {
-            throw new \RuntimeException($this->getOptionNotFoundMessage($option));
+            $this->printer->put($this->getOptionNotFoundMessage($option), "comment");
+            return;
         }
 
-        if ($input->getOption("unserialize")) {
-            $unserializedValue = @unserialize($optionValue);
-        }
-
-        $this->printer->info($this->formatOptionValue($unserializedValue ?? $optionValue));
+        /** @noinspection PhpUndefinedClassInspection */
+        /** @noinspection PhpUndefinedNamespaceInspection */
+        /** @phpstan-ignore-next-line */
+        \Bitrix\Main\Config\Option::delete(
+            $moduleName,
+            [
+                'name' => $optionName,
+                'site_id' => $siteId ?? '',
+            ],
+        );
     }
 
     /**
@@ -135,29 +133,22 @@ class GetCommand extends KernelCommand
         /** @var string $option */
         $option = $input->getArgument("option");
 
-        $line = $this->decodeRemoteJsonResult(
+        $result = $this->decodeRemoteJsonResult(
             $this->executeRemotePhp(
                 $remote,
-                $this->remoteOptionPhpCodeBuilder->buildGet($option, (bool) $input->getOption("unserialize"))
+                $this->remoteOptionPhpCodeBuilder->buildDelete($option)
             ),
-            'Не удалось получить опцию удаленного проекта.',
+            'Не удалось удалить опцию удаленного проекта.',
         );
 
-        $this->printer->info($this->formatOptionValue($line));
+        if (is_array($result) && ($result['warning'] ?? null) === 'OPTION_NOT_FOUND') {
+            $this->printer->put($this->getOptionNotFoundMessage($option), "comment");
+        }
     }
 
     private function getOptionNotFoundMessage(string $option): string
     {
         return sprintf('Опция %s не найдена в БД.', $option);
-    }
-
-    private function formatOptionValue(mixed $value): string
-    {
-        if (is_scalar($value)) {
-            return (string) $value;
-        }
-
-        return (string) to_json($value);
     }
 
     /**
