@@ -54,6 +54,12 @@ class SetCommand extends BxCommand
                         'Кодовое имя удаленного проекта',
                     ),
                     new InputOption(
+                        'local',
+                        null,
+                        InputOption::VALUE_NONE,
+                        'Отключить неявный remote текущей сессии',
+                    ),
+                    new InputOption(
                         'extra',
                         null,
                         InputOption::VALUE_NONE,

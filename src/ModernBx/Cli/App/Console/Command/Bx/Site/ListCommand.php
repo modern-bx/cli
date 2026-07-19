@@ -62,6 +62,12 @@ class ListCommand extends KernelCommand
                         'Кодовое имя удаленного проекта',
                     ),
                     new InputOption(
+                        'local',
+                        null,
+                        InputOption::VALUE_NONE,
+                        'Отключить неявный remote текущей сессии',
+                    ),
+                    new InputOption(
                         'filter',
                         null,
                         InputOption::VALUE_REQUIRED,

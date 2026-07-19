@@ -36,6 +36,7 @@ class DeleteCommand extends BxCommand
             ->setDescription('Удаляет файл из файловой структуры проекта')
             ->setHelp('Удаляет файл по пути относительно document root локального или удаленного проекта.')
             ->addOption('remote', null, InputOption::VALUE_REQUIRED, 'Кодовое имя удаленного проекта')
+            ->addOption('local', null, InputOption::VALUE_NONE, 'Отключить неявный remote текущей сессии')
             ->addArgument('path', InputArgument::REQUIRED, 'Путь к файлу относительно document root проекта');
     }
 

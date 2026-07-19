@@ -50,6 +50,7 @@ class ExecCommand extends DbCommand
             ->setDescription($this->trans('command.db_exec.description'))
             ->setHelp($this->trans('command.db_exec.help'))
             ->addOption('remote', null, InputOption::VALUE_REQUIRED, 'Кодовое имя удаленного проекта')
+            ->addOption('local', null, InputOption::VALUE_NONE, 'Отключить неявный remote текущей сессии')
             ->addOption('page', null, InputOption::VALUE_REQUIRED, 'Номер страницы результата')
             ->addOption('size', null, InputOption::VALUE_REQUIRED, 'Размер страницы результата', 100)
             ->addOption('php', null, InputOption::VALUE_NONE, 'Выполнить удаленный SQL через PHP-консоль');

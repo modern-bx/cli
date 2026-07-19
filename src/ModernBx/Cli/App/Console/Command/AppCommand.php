@@ -115,6 +115,13 @@ class AppCommand extends GenericCommand
             return false;
         }
 
+        $local = $input->hasOption('local') && $input->getOption('local') === true;
+        $remote = $input->hasOption('remote') ? $input->getOption('remote') : null;
+
+        if ($local && $remote === null) {
+            return false;
+        }
+
         if (!$input->hasOption('remote')) {
             $output->writeln(sprintf(
                 '<comment>Команда запущена в контексте remote %s, но не поддерживает remote. Завершение.</comment>',
