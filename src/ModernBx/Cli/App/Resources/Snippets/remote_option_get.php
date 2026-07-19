@@ -34,7 +34,7 @@ try {
     );
 
     if ($optionValue === $defaultValue) {
-        throw new RuntimeException(sprintf('Опция %s не найдена в бд.', $option));
+        throw new RuntimeException(sprintf('Опция %s не найдена в БД.', $option));
     }
 
     if ($unserialize) {

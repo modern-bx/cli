@@ -148,7 +148,7 @@ class GetCommand extends KernelCommand
 
     private function getOptionNotFoundMessage(string $option): string
     {
-        return sprintf('Опция %s не найдена в бд.', $option);
+        return sprintf('Опция %s не найдена в БД.', $option);
     }
 
     private function formatOptionValue(mixed $value): string
