@@ -16,6 +16,7 @@ use ModernBx\Cli\App\Service\Remote\RemoteProjectConfigManager;
 use ModernBx\Cli\App\Service\Remote\RemoteCachePhpCodeBuilder;
 use ModernBx\Cli\App\Service\Remote\RemoteDbPhpCodeBuilder;
 use ModernBx\Cli\App\Service\Remote\RemoteFileApplyPhpCodeBuilder;
+use ModernBx\Cli\App\Service\Remote\RemoteFilePhpCodeBuilder;
 use ModernBx\Cli\App\Service\Remote\RemoteModulePhpCodeBuilder;
 use ModernBx\Cli\App\Service\Remote\RemoteOptionPhpCodeBuilder;
 use ModernBx\Cli\App\Service\Remote\RemoteSettingPhpCodeBuilder;
@@ -108,6 +109,9 @@ final class DefaultContainerBuilder
 
         $this->containerBuilder
             ->autowire(RemoteFileApplyPhpCodeBuilder::class, RemoteFileApplyPhpCodeBuilder::class);
+
+        $this->containerBuilder
+            ->autowire(RemoteFilePhpCodeBuilder::class, RemoteFilePhpCodeBuilder::class);
 
         $this->containerBuilder
             ->autowire(RemoteSettingPhpCodeBuilder::class, RemoteSettingPhpCodeBuilder::class);

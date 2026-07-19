@@ -8,7 +8,7 @@ use ModernBx\Cli\App\Console\Command\BxCommand;
 use ModernBx\Cli\App\Service\Remote\BitrixAdminClient;
 use ModernBx\Cli\App\Service\Remote\RemoteProjectConfigManager;
 use ModernBx\Cli\App\Service\Remote\RemoteFileApplyPhpCodeBuilder;
-use Symfony\Component\Console\Helper\ProgressBar;
+use ModernBx\Cli\App\Service\Remote\RemoteFilePhpCodeBuilder;
 use Symfony\Component\Console\Helper\QuestionHelper;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
@@ -20,24 +20,26 @@ class ApplyCommand extends BxCommand
 {
     protected static $defaultName = 'file:apply';
 
-    private const PROGRESS_BAR_THRESHOLD = 1048576;
-
     protected RemoteProjectConfigManager $remoteProjectConfigManager;
 
     protected BitrixAdminClient $bitrixAdminClient;
 
     protected RemoteFileApplyPhpCodeBuilder $remoteFileApplyPhpCodeBuilder;
 
+    protected RemoteFilePhpCodeBuilder $remoteFilePhpCodeBuilder;
+
     public function __construct(
         RemoteProjectConfigManager $remoteProjectConfigManager,
         BitrixAdminClient $bitrixAdminClient,
-        RemoteFileApplyPhpCodeBuilder $remoteFileApplyPhpCodeBuilder
+        RemoteFileApplyPhpCodeBuilder $remoteFileApplyPhpCodeBuilder,
+        RemoteFilePhpCodeBuilder $remoteFilePhpCodeBuilder
     ) {
         parent::__construct();
 
         $this->remoteProjectConfigManager = $remoteProjectConfigManager;
         $this->bitrixAdminClient = $bitrixAdminClient;
         $this->remoteFileApplyPhpCodeBuilder = $remoteFileApplyPhpCodeBuilder;
+        $this->remoteFilePhpCodeBuilder = $remoteFilePhpCodeBuilder;
     }
 
     protected function configure(): void
@@ -134,6 +136,18 @@ class ApplyCommand extends BxCommand
 ): array {
             return $this->diagnoseRemote($endpoint, $sessionId, $dest, $plan, $force);
         });
+        /** @var array{upload_max_filesize: string, post_max_size: string, max_post_file_bytes: int} $limits */
+        $limits = $this->withRemoteSessionRetry($codename, $config, $endpoint, $sessionId, function (
+            string $sessionId
+        ) use (
+            $endpoint
+): array {
+            return $this->loadRemoteUploadLimits($endpoint, $sessionId);
+        });
+        $diagnostics['errors'] = array_merge(
+            $diagnostics['errors'],
+            $this->diagnoseRemoteUploadLimits($plan['files'], $limits),
+        );
         $this->printDiagnostics($diagnostics);
         $this->ensureCanContinue($diagnostics, $src, $dest, $yes, $input, $output);
 
@@ -341,6 +355,74 @@ class ApplyCommand extends BxCommand
         ];
     }
 
+    /**
+     * @return array{
+     *     upload_max_filesize: string,
+     *     post_max_size: string,
+     *     max_post_file_bytes: int
+     * }
+     */
+    protected function loadRemoteUploadLimits(string $endpoint, string $sessionId): array
+    {
+        $json = $this->bitrixAdminClient->executePhp(
+            $endpoint,
+            $sessionId,
+            $this->remoteFilePhpCodeBuilder->buildUploadLimits(),
+        );
+        $result = json_decode($json, true);
+
+        if (!is_array($result) || ($result['ok'] ?? false) !== true) {
+            $error = is_array($result) && is_string($result['error'] ?? null)
+                ? $result['error']
+                : 'Не удалось получить ограничения загрузки удаленного проекта.';
+            throw new \RuntimeException($error);
+        }
+
+        return [
+            'upload_max_filesize' => is_string($result['upload_max_filesize'] ?? null)
+                ? $result['upload_max_filesize']
+                : '',
+            'post_max_size' => is_string($result['post_max_size'] ?? null) ? $result['post_max_size'] : '',
+            'max_post_file_bytes' => (int) ($result['max_post_file_bytes'] ?? 0),
+        ];
+    }
+
+    /**
+     * @param array<int, array{relative: string, path: string, size: int}> $files
+     * @param array{upload_max_filesize: string, post_max_size: string, max_post_file_bytes: int} $limits
+     * @return string[]
+     */
+    protected function diagnoseRemoteUploadLimits(array $files, array $limits): array
+    {
+        $limit = $limits['max_post_file_bytes'];
+
+        if ($limit <= 0) {
+            return [];
+        }
+
+        $errors = [];
+
+        foreach ($files as $file) {
+            if ($file['size'] <= $limit) {
+                continue;
+            }
+
+            $errors[] = sprintf(
+                'Файл превышает лимит загрузки PHP: %s (%s (%d байт)) > %s '
+                    . '(%d байт; upload_max_filesize=%s, post_max_size=%s).',
+                $file['relative'],
+                $this->formatBytes($file['size']),
+                $file['size'],
+                $this->formatBytes($limit),
+                $limit,
+                $limits['upload_max_filesize'],
+                $limits['post_max_size'],
+            );
+        }
+
+        return $errors;
+    }
+
     /** @param array{notices: string[], errors: string[]} $diagnostics */
     protected function printDiagnostics(array $diagnostics): void
     {
@@ -445,13 +527,10 @@ class ApplyCommand extends BxCommand
             $target = $this->joinProjectPath($dest, $file['relative']);
             $fullTarget = $documentRoot . $target;
             $this->printer->info(sprintf('Копирование файла: %s', $target));
-            $progressBar = $this->startProgress($file['size'], $output);
-
             if (!copy($file['path'], $fullTarget)) {
                 throw new \RuntimeException(sprintf('Не удалось скопировать файл: %s', $target), static::CODE_IO_ERROR);
             }
 
-            $this->finishProgress($progressBar, $file['size'], $output);
             $uploaded++;
             $bytes += $file['size'];
         }
@@ -481,8 +560,6 @@ class ApplyCommand extends BxCommand
             $directory = dirname($target);
             $filename = basename($target);
             $this->printer->info(sprintf('Загрузка файла: %s', $target));
-            $progressBar = $this->startProgress($file['size'], $output);
-
             $this->withRemoteSessionRetry($codename, $config, $endpoint, $sessionId, function (
                 string $sessionId
             ) use (
@@ -494,36 +571,11 @@ class ApplyCommand extends BxCommand
                 $this->bitrixAdminClient->uploadFile($endpoint, $sessionId, $file['path'], $directory, $filename);
             });
 
-            $this->finishProgress($progressBar, $file['size'], $output);
             $uploaded++;
             $bytes += $file['size'];
         }
 
         return ['files' => $uploaded, 'bytes' => $bytes];
-    }
-
-    protected function startProgress(int $size, OutputInterface $output): ?ProgressBar
-    {
-        if ($size <= self::PROGRESS_BAR_THRESHOLD) {
-            return null;
-        }
-
-        $progressBar = new ProgressBar($output, $size);
-        $progressBar->setFormat(' %current%/%max% байт [%bar%] %percent:3s%% %elapsed:6s%/%estimated:-6s%');
-        $progressBar->start();
-
-        return $progressBar;
-    }
-
-    protected function finishProgress(?ProgressBar $progressBar, int $size, OutputInterface $output): void
-    {
-        if ($progressBar === null) {
-            return;
-        }
-
-        $progressBar->advance($size);
-        $progressBar->finish();
-        $output->writeln('');
     }
 
     /** @param mixed[] $config */

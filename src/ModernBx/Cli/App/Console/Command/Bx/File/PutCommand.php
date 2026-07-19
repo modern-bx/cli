@@ -6,6 +6,7 @@ namespace ModernBx\Cli\App\Console\Command\Bx\File;
 
 use ModernBx\Cli\App\Console\Command\AppCommand;
 use ModernBx\Cli\App\Service\Remote\BitrixAdminClient;
+use ModernBx\Cli\App\Service\Remote\RemoteFilePhpCodeBuilder;
 use ModernBx\Cli\App\Service\Remote\RemoteProjectConfigManager;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
@@ -20,14 +21,18 @@ class PutCommand extends AppCommand
 
     protected BitrixAdminClient $bitrixAdminClient;
 
+    protected RemoteFilePhpCodeBuilder $remoteFilePhpCodeBuilder;
+
     public function __construct(
         RemoteProjectConfigManager $remoteProjectConfigManager,
-        BitrixAdminClient $bitrixAdminClient
+        BitrixAdminClient $bitrixAdminClient,
+        RemoteFilePhpCodeBuilder $remoteFilePhpCodeBuilder
     ) {
         parent::__construct();
 
         $this->remoteProjectConfigManager = $remoteProjectConfigManager;
         $this->bitrixAdminClient = $bitrixAdminClient;
+        $this->remoteFilePhpCodeBuilder = $remoteFilePhpCodeBuilder;
     }
 
     protected function configure(): void
@@ -81,6 +86,8 @@ class PutCommand extends AppCommand
             $sessionId = $this->remoteProjectConfigManager->refreshSession($codename, $config);
         }
 
+        $sessionId = $this->ensureRemoteUploadAllowed($codename, $config, $endpoint, $sessionId, $src);
+
         if ($force) {
             try {
                 $this->deleteRemoteFile($endpoint, $sessionId, rtrim($remoteDirectory, '/') . '/' . $filename);
@@ -106,6 +113,81 @@ class PutCommand extends AppCommand
         }
 
         $this->printer->info(sprintf('Файл загружен: %s/%s', rtrim($remoteDirectory, '/'), $filename));
+    }
+
+    /** @param mixed[] $config */
+    protected function ensureRemoteUploadAllowed(
+        string $codename,
+        array $config,
+        string $endpoint,
+        string $sessionId,
+        string $src
+    ): string {
+        try {
+            $limits = $this->loadRemoteUploadLimits($endpoint, $sessionId);
+        } catch (\RuntimeException $err) {
+            if ($err->getMessage() !== 'REMOTE_SESSION_EXPIRED') {
+                throw $err;
+            }
+
+            $sessionId = $this->remoteProjectConfigManager->refreshSession($codename, $config);
+            $limits = $this->loadRemoteUploadLimits($endpoint, $sessionId);
+        }
+
+        $limit = $limits['max_post_file_bytes'];
+        $size = filesize($src);
+
+        if ($size === false) {
+            throw new \RuntimeException(sprintf('Не удалось определить размер файла: %s', $src), static::CODE_IO_ERROR);
+        }
+
+        if ($limit > 0 && $size > $limit) {
+            throw new \RuntimeException(sprintf(
+                'Файл %s (%s (%d байт)) больше лимита загрузки PHP %s '
+                    . '(%d байт; upload_max_filesize=%s, post_max_size=%s).',
+                basename($src),
+                $this->formatBytes($size),
+                $size,
+                $this->formatBytes($limit),
+                $limit,
+                $limits['upload_max_filesize'],
+                $limits['post_max_size'],
+            ), static::CODE_INVALID_ARGUMENT_VALUE);
+        }
+
+        return $sessionId;
+    }
+
+    /**
+     * @return array{
+     *     upload_max_filesize: string,
+     *     post_max_size: string,
+     *     max_post_file_bytes: int
+     * }
+     */
+    protected function loadRemoteUploadLimits(string $endpoint, string $sessionId): array
+    {
+        $json = $this->bitrixAdminClient->executePhp(
+            $endpoint,
+            $sessionId,
+            $this->remoteFilePhpCodeBuilder->buildUploadLimits(),
+        );
+        $result = json_decode($json, true);
+
+        if (!is_array($result) || ($result['ok'] ?? false) !== true) {
+            $error = is_array($result) && is_string($result['error'] ?? null)
+                ? $result['error']
+                : 'Не удалось получить ограничения загрузки удаленного проекта.';
+            throw new \RuntimeException($error);
+        }
+
+        return [
+            'upload_max_filesize' => is_string($result['upload_max_filesize'] ?? null)
+                ? $result['upload_max_filesize']
+                : '',
+            'post_max_size' => is_string($result['post_max_size'] ?? null) ? $result['post_max_size'] : '',
+            'max_post_file_bytes' => (int) ($result['max_post_file_bytes'] ?? 0),
+        ];
     }
 
     protected function deleteRemoteFile(string $endpoint, string $sessionId, string $path): void
@@ -199,5 +281,23 @@ class PutCommand extends AppCommand
         }
 
         return '/' . implode('/', $segments);
+    }
+
+    protected function formatBytes(int $bytes): string
+    {
+        $units = ['байт', 'КБ', 'МБ', 'ГБ'];
+        $value = (float) $bytes;
+
+        foreach ($units as $index => $unit) {
+            if ($value < 1024 || $index === count($units) - 1) {
+                return $index === 0
+                    ? $bytes . ' ' . $unit
+                    : rtrim(rtrim(number_format($value, 1, '.', ''), '0'), '.') . ' ' . $unit;
+            }
+
+            $value /= 1024;
+        }
+
+        return $bytes . ' байт';
     }
 }
