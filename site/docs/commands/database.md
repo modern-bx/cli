@@ -21,27 +21,31 @@ echo 'select * from b_user' | php cli.phar db:exec --remote=prod --page=1 --size
 - `--size` — размер страницы, по умолчанию `100`.
 - `--php` — выполнить удалённый SQL через PHP-консоль.
 
-## `db:dump <file> [--table=<tables>]`
+## `db:dump [--remote=<codename>] [file] [--table=<tables>]`
 
-Создаёт SQL-дамп базы в файл. Можно ограничить набор таблиц через `--table`; список задаётся через запятую, для PostgreSQL допустим формат `schema.table`.
+Создаёт SQL-дамп базы в файл или, если файл не указан, в stdout. Можно ограничить набор таблиц через `--table`; список задаётся через запятую, для PostgreSQL допустим формат `schema.table`. С `--remote` дамп формируется на зарегистрированном удалённом проекте через PHP-консоль админки и затем сохраняется в локальный файл или выводится в stdout.
 
 ```bash
 php cli.phar db:dump var/backup.sql
 php cli.phar db:dump var/users.sql --table=b_user,b_user_group
+php cli.phar db:dump --remote=prod var/prod.sql --table=b_user
 ```
 
-## `db:apply <file>`
+## `db:apply [--remote=<codename>] [file]`
 
-Выполняет SQL-файл в базе проекта. Команда подходит для восстановления дампа или применения подготовленного SQL-скрипта.
+Выполняет SQL-файл или, если файл не указан, SQL из stdin в базе проекта. Если stdin пустой, команда завершается с предупреждением. Команда подходит для восстановления дампа или применения подготовленного SQL-скрипта. С `--remote` локальный SQL-файл отправляется и выполняется на зарегистрированном удалённом проекте через PHP-консоль админки.
 
 ```bash
 php cli.phar db:apply var/backup.sql
+php cli.phar db:apply --remote=prod var/backup.sql
+cat var/backup.sql | php cli.phar db:apply --remote=prod
 ```
 
-## `db:wipe [--table=<tables>]`
+## `db:wipe [--remote=<codename>] [--table=<tables>]`
 
-Очищает таблицы через `TRUNCATE`. Без `--table` удаляет данные из всех таблиц найденной базы, поэтому используйте команду осторожно.
+Очищает таблицы через `TRUNCATE`. Без `--table` удаляет данные из всех таблиц найденной базы, поэтому используйте команду осторожно. С `--remote` очистка выполняется на зарегистрированном удалённом проекте через PHP-консоль админки.
 
 ```bash
 php cli.phar db:wipe --table=b_cache_tag,b_event
+php cli.phar db:wipe --remote=prod --table=b_cache_tag
 ```

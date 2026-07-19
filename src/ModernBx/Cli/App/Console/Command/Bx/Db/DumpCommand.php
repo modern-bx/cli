@@ -6,6 +6,10 @@ namespace ModernBx\Cli\App\Console\Command\Bx\Db;
 
 use ModernBx\Cli\App\Service\Db\MySqlDumper;
 use ModernBx\Cli\App\Service\Db\PgSqlDumper;
+use ModernBx\Cli\App\Service\Remote\BitrixAdminClient;
+use ModernBx\Cli\App\Service\Remote\RemoteDbPhpCodeBuilder;
+use ModernBx\Cli\App\Service\Remote\RemotePhpTrait;
+use ModernBx\Cli\App\Service\Remote\RemoteProjectConfigManager;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputDefinition;
 use Symfony\Component\Console\Input\InputInterface;
@@ -14,18 +18,30 @@ use Symfony\Component\Console\Output\OutputInterface;
 
 class DumpCommand extends DbCommand
 {
+    use RemotePhpTrait;
+
     protected static $defaultName = 'db:dump';
 
     private MySqlDumper $mySqlDumper;
 
     private PgSqlDumper $pgSqlDumper;
 
-    public function __construct(MySqlDumper $mySqlDumper, PgSqlDumper $pgSqlDumper)
-    {
+    private RemoteDbPhpCodeBuilder $remoteDbPhpCodeBuilder;
+
+    public function __construct(
+        MySqlDumper $mySqlDumper,
+        PgSqlDumper $pgSqlDumper,
+        RemoteProjectConfigManager $remoteProjectConfigManager,
+        BitrixAdminClient $bitrixAdminClient,
+        RemoteDbPhpCodeBuilder $remoteDbPhpCodeBuilder
+    ) {
         parent::__construct();
 
         $this->mySqlDumper = $mySqlDumper;
         $this->pgSqlDumper = $pgSqlDumper;
+        $this->remoteProjectConfigManager = $remoteProjectConfigManager;
+        $this->bitrixAdminClient = $bitrixAdminClient;
+        $this->remoteDbPhpCodeBuilder = $remoteDbPhpCodeBuilder;
     }
 
     protected function configure(): void
@@ -37,7 +53,7 @@ class DumpCommand extends DbCommand
                 new InputDefinition([
                     new InputArgument(
                         'file',
-                        InputArgument::REQUIRED,
+                        InputArgument::OPTIONAL,
                         $this->trans('argument.db_dump.file'),
                     ),
                     new InputOption(
@@ -46,6 +62,8 @@ class DumpCommand extends DbCommand
                         InputOption::VALUE_REQUIRED,
                         $this->trans('option.db.table'),
                     ),
+                    new InputOption('remote', null, InputOption::VALUE_REQUIRED, 'Кодовое имя удаленного проекта'),
+                    new InputOption('local', null, InputOption::VALUE_NONE, 'Отключить неявный remote текущей сессии'),
                 ]),
             );
     }
@@ -58,22 +76,88 @@ class DumpCommand extends DbCommand
      */
     protected function executeInternal(InputInterface $input, OutputInterface $output): void
     {
-        parent::executeInternal($input, $output);
-
         $file = $input->getArgument('file');
 
-        if (!is_string($file) || $file === '') {
+        if ($file !== null && (!is_string($file) || $file === '')) {
             throw new \Exception($this->trans('error.db_dump.file_string'), static::CODE_INVALID_ARGUMENT_VALUE);
         }
 
-        $config = $this->getConnectionConfig();
         $tables = $this->getTableFilter($input);
+        $remote = $input->getOption('remote');
+
+        if (is_string($remote)) {
+            $dump = $this->executeRemote($remote, $tables);
+            $this->writeDump($output, $file, $dump);
+            return;
+        }
+
+        parent::executeInternal($input, $output);
+
+        $config = $this->getConnectionConfig();
+        $outputFile = $file ?? $this->createTempDumpFile();
 
         if ($config['type'] === 'postgres') {
-            $this->pgSqlDumper->dump($config, $file, $tables);
+            $this->pgSqlDumper->dump($config, $outputFile, $tables);
         } else {
-            $this->mySqlDumper->dump($config, $file, $tables);
+            $this->mySqlDumper->dump($config, $outputFile, $tables);
         }
+
+        if ($file === null) {
+            $dump = file_get_contents($outputFile);
+            @unlink($outputFile);
+
+            if ($dump === false) {
+                throw new \Exception('Unable to read dump file: ' . $outputFile);
+            }
+
+            $output->write($dump);
+            return;
+        }
+
         $this->printer->info($this->trans('message.db_dump.created', ['%file%' => $file]));
+    }
+
+    /** @param array<int, string>|null $tables */
+    protected function executeRemote(string $remote, ?array $tables): string
+    {
+        $json = $this->executeRemotePhp($remote, $this->remoteDbPhpCodeBuilder->buildDump($tables));
+        $dump = $this->decodeRemoteJsonResult($json, 'Не удалось создать дамп базы данных удаленного проекта.');
+
+        if (!is_string($dump)) {
+            throw new \RuntimeException('Удаленная PHP-консоль вернула некорректный дамп базы данных.');
+        }
+
+        return $dump;
+    }
+
+    protected function writeDump(OutputInterface $output, mixed $file, string $dump): void
+    {
+        if ($file === null) {
+            $output->write($dump);
+            return;
+        }
+
+        $directory = dirname($file);
+
+        if (!is_dir($directory) && !mkdir($directory, 0775, true) && !is_dir($directory)) {
+            throw new \Exception('Unable to create dump directory: ' . $directory);
+        }
+
+        if (file_put_contents($file, $dump) === false) {
+            throw new \Exception('Unable to write dump file: ' . $file);
+        }
+
+        $this->printer->info($this->trans('message.db_dump.created', ['%file%' => $file]));
+    }
+
+    protected function createTempDumpFile(): string
+    {
+        $file = tempnam(sys_get_temp_dir(), 'bx-cli-db-dump-');
+
+        if ($file === false) {
+            throw new \Exception('Unable to create temporary dump file.');
+        }
+
+        return $file;
     }
 }
