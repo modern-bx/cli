@@ -86,7 +86,13 @@ class PutCommand extends AppCommand
             $sessionId = $this->remoteProjectConfigManager->refreshSession($codename, $config);
         }
 
-        $sessionId = $this->ensureRemoteUploadAllowed($codename, $config, $endpoint, $sessionId, $src);
+        [$sessionId, $limits] = $this->loadRemoteUploadLimitsWithRefresh($codename, $config, $endpoint, $sessionId);
+
+        $size = filesize($src);
+
+        if ($size === false) {
+            throw new \RuntimeException(sprintf('Не удалось определить размер файла: %s', $src), static::CODE_IO_ERROR);
+        }
 
         if ($force) {
             try {
@@ -101,58 +107,228 @@ class PutCommand extends AppCommand
             }
         }
 
-        try {
-            $this->bitrixAdminClient->uploadFile($endpoint, $sessionId, $src, $remoteDirectory, $filename);
-        } catch (\RuntimeException $err) {
-            if ($err->getMessage() !== 'REMOTE_SESSION_EXPIRED') {
-                throw $err;
-            }
+        if ($this->shouldUploadInChunks($size, $limits['max_post_file_bytes'])) {
+            $sessionId = $this->uploadFileInChunks(
+                $codename,
+                $config,
+                $endpoint,
+                $sessionId,
+                $src,
+                $size,
+                $remoteDirectory,
+                $filename,
+                $limits['max_post_file_bytes'],
+            );
+        } else {
+            try {
+                $this->bitrixAdminClient->uploadFile($endpoint, $sessionId, $src, $remoteDirectory, $filename);
+            } catch (\RuntimeException $err) {
+                if ($err->getMessage() !== 'REMOTE_SESSION_EXPIRED') {
+                    throw $err;
+                }
 
-            $sessionId = $this->remoteProjectConfigManager->refreshSession($codename, $config);
-            $this->bitrixAdminClient->uploadFile($endpoint, $sessionId, $src, $remoteDirectory, $filename);
+                $sessionId = $this->remoteProjectConfigManager->refreshSession($codename, $config);
+                $this->bitrixAdminClient->uploadFile($endpoint, $sessionId, $src, $remoteDirectory, $filename);
+            }
         }
 
         $this->printer->info(sprintf('Файл загружен: %s/%s', rtrim($remoteDirectory, '/'), $filename));
     }
 
-    /** @param mixed[] $config */
-    protected function ensureRemoteUploadAllowed(
+    /**
+     * @param mixed[] $config
+     * @return array{0: string, 1: array{upload_max_filesize: string, post_max_size: string, max_post_file_bytes: int}}
+     */
+    protected function loadRemoteUploadLimitsWithRefresh(
         string $codename,
         array $config,
         string $endpoint,
-        string $sessionId,
-        string $src
-    ): string {
+        string $sessionId
+    ): array {
         try {
-            $limits = $this->loadRemoteUploadLimits($endpoint, $sessionId);
+            return [$sessionId, $this->loadRemoteUploadLimits($endpoint, $sessionId)];
         } catch (\RuntimeException $err) {
             if ($err->getMessage() !== 'REMOTE_SESSION_EXPIRED') {
                 throw $err;
             }
 
             $sessionId = $this->remoteProjectConfigManager->refreshSession($codename, $config);
-            $limits = $this->loadRemoteUploadLimits($endpoint, $sessionId);
+
+            return [$sessionId, $this->loadRemoteUploadLimits($endpoint, $sessionId)];
+        }
+    }
+
+    protected function shouldUploadInChunks(int $size, int $limit): bool
+    {
+        return $limit > 0 && $size > $this->getChunkSize($limit);
+    }
+
+    protected function getChunkSize(int $limit): int
+    {
+        $reserve = max(65536, (int) ceil($limit * 0.05));
+        $chunkSize = $limit - $reserve;
+
+        if ($chunkSize < 1) {
+            throw new \RuntimeException(
+                sprintf('Лимит загрузки PHP слишком мал для передачи файла частями: %d байт.', $limit),
+                static::CODE_INVALID_ARGUMENT_VALUE,
+            );
         }
 
-        $limit = $limits['max_post_file_bytes'];
-        $size = filesize($src);
+        return $chunkSize;
+    }
 
-        if ($size === false) {
-            throw new \RuntimeException(sprintf('Не удалось определить размер файла: %s', $src), static::CODE_IO_ERROR);
+    /** @param mixed[] $config */
+    protected function uploadFileInChunks(
+        string $codename,
+        array $config,
+        string $endpoint,
+        string $sessionId,
+        string $src,
+        int $size,
+        string $remoteDirectory,
+        string $filename,
+        int $limit
+    ): string {
+        $chunkSize = $this->getChunkSize($limit);
+        $chunkCount = (int) ceil($size / $chunkSize);
+        $prefix = '.' . $filename . '.upload-' . bin2hex(random_bytes(8));
+        $remoteChunks = [];
+        $source = fopen($src, 'rb');
+
+        if ($source === false) {
+            throw new \RuntimeException(sprintf('Не удалось открыть файл для чтения: %s', $src), static::CODE_IO_ERROR);
         }
 
-        if ($limit > 0 && $size > $limit) {
-            throw new \RuntimeException(sprintf(
-                'Файл %s (%s (%d байт)) больше лимита загрузки PHP %s '
-                    . '(%d байт; upload_max_filesize=%s, post_max_size=%s).',
-                basename($src),
-                $this->formatBytes($size),
-                $size,
-                $this->formatBytes($limit),
-                $limit,
-                $limits['upload_max_filesize'],
-                $limits['post_max_size'],
-            ), static::CODE_INVALID_ARGUMENT_VALUE);
+        try {
+            for ($index = 1; $index <= $chunkCount; $index++) {
+                $chunkFilename = sprintf('%s.part%05d', $prefix, $index);
+                $chunkPath = $this->writeLocalChunk($source, $chunkSize, $chunkFilename);
+
+                try {
+                    try {
+                        $this->bitrixAdminClient->uploadFile(
+                            $endpoint,
+                            $sessionId,
+                            $chunkPath,
+                            $remoteDirectory,
+                            $chunkFilename,
+                        );
+                    } catch (\RuntimeException $err) {
+                        if ($err->getMessage() !== 'REMOTE_SESSION_EXPIRED') {
+                            throw $err;
+                        }
+
+                        $sessionId = $this->remoteProjectConfigManager->refreshSession($codename, $config);
+                        $this->bitrixAdminClient->uploadFile(
+                            $endpoint,
+                            $sessionId,
+                            $chunkPath,
+                            $remoteDirectory,
+                            $chunkFilename,
+                        );
+                    }
+                } finally {
+                    @unlink($chunkPath);
+                }
+
+                $remoteChunks[] = rtrim($remoteDirectory, '/') . '/' . $chunkFilename;
+                $sent = min($size, $index * $chunkSize);
+                $percent = $size === 0 ? 100 : (int) floor($sent * 100 / $size);
+                $this->printer->info(sprintf(
+                    'Отправлена часть %d/%d (%d байт, %d%%).',
+                    $index,
+                    $chunkCount,
+                    $sent,
+                    $percent,
+                ));
+            }
+        } finally {
+            fclose($source);
+        }
+
+        return $this->mergeRemoteChunks(
+            $codename,
+            $config,
+            $endpoint,
+            $sessionId,
+            $remoteChunks,
+            rtrim($remoteDirectory, '/') . '/' . $filename,
+        );
+    }
+
+    /** @param resource $source */
+    protected function writeLocalChunk($source, int $chunkSize, string $chunkFilename): string
+    {
+        $chunkPath = rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . $chunkFilename;
+        $target = fopen($chunkPath, 'wb');
+
+        if ($target === false) {
+            throw new \RuntimeException(
+                sprintf('Не удалось создать временный файл: %s', $chunkPath),
+                static::CODE_IO_ERROR,
+            );
+        }
+
+        try {
+            $remaining = $chunkSize;
+
+            while ($remaining > 0 && !feof($source)) {
+                $buffer = fread($source, min($remaining, 1024 * 1024));
+
+                if ($buffer === false) {
+                    throw new \RuntimeException('Не удалось прочитать очередную часть файла.', static::CODE_IO_ERROR);
+                }
+
+                if ($buffer === '') {
+                    break;
+                }
+
+                if (fwrite($target, $buffer) === false) {
+                    throw new \RuntimeException('Не удалось записать временную часть файла.', static::CODE_IO_ERROR);
+                }
+
+                $remaining -= strlen($buffer);
+            }
+        } finally {
+            fclose($target);
+        }
+
+        return $chunkPath;
+    }
+
+    /**
+     * @param mixed[] $config
+     * @param string[] $chunks
+     */
+    protected function mergeRemoteChunks(
+        string $codename,
+        array $config,
+        string $endpoint,
+        string $sessionId,
+        array $chunks,
+        string $destination
+    ): string {
+        $code = $this->remoteFilePhpCodeBuilder->buildMergeChunks($destination, $chunks);
+
+        try {
+            $json = $this->bitrixAdminClient->executePhp($endpoint, $sessionId, $code);
+        } catch (\RuntimeException $err) {
+            if ($err->getMessage() !== 'REMOTE_SESSION_EXPIRED') {
+                throw $err;
+            }
+
+            $sessionId = $this->remoteProjectConfigManager->refreshSession($codename, $config);
+            $json = $this->bitrixAdminClient->executePhp($endpoint, $sessionId, $code);
+        }
+
+        $result = json_decode($json, true);
+
+        if (!is_array($result) || ($result['ok'] ?? false) !== true) {
+            $error = is_array($result) && is_string($result['error'] ?? null)
+                ? $result['error']
+                : 'Не удалось объединить части файла на удаленном проекте.';
+            throw new \RuntimeException($error);
         }
 
         return $sessionId;
