@@ -34,14 +34,10 @@ try {
         $rows[] = array_values($row);
     }
 
-    echo json_encode([
-        'ok' => true,
+    echo CommandResult::successData([
         'columns' => $columns,
         'rows' => $rows,
-    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    ]);
 } catch (\Throwable $err) {
-    echo json_encode([
-        'ok' => false,
-        'error' => $err->getMessage(),
-    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    echo CommandResult::error($err->getMessage());
 }

@@ -6,6 +6,8 @@ namespace ModernBx\Cli\App\Service\Remote;
 
 final class RemoteSettingPhpCodeBuilder
 {
+    use RemoteSnippetMixins;
+
     private const SNIPPET_DIR = __DIR__ . '/../../Resources/Snippets';
 
     public function buildGet(bool $extra, string $path, int $flags): string
@@ -37,6 +39,6 @@ final class RemoteSettingPhpCodeBuilder
 
         $code = strtr($snippet, $replacements);
 
-        return preg_replace('/^<\?php\s*/', '', $code, 1) ?? $code;
+        return $this->withSnippetMixins($code);
     }
 }

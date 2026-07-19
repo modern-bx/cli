@@ -32,13 +32,7 @@ try {
         $sites[] = $site;
     }
 
-    echo json_encode([
-        'ok' => true,
-        'result' => $sites,
-    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    echo CommandResult::success($sites);
 } catch (\Throwable $err) {
-    echo json_encode([
-        'ok' => false,
-        'error' => $err->getMessage(),
-    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    echo CommandResult::error($err->getMessage());
 }

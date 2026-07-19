@@ -72,13 +72,7 @@ try {
         throw new \RuntimeException('Unable to write settings file: ' . $file);
     }
 
-    echo json_encode([
-        'ok' => true,
-        'result' => true,
-    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    echo CommandResult::success(true);
 } catch (\Throwable $err) {
-    echo json_encode([
-        'ok' => false,
-        'error' => $err->getMessage(),
-    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    echo CommandResult::error($err->getMessage());
 }

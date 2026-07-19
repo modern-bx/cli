@@ -6,6 +6,8 @@ namespace ModernBx\Cli\App\Service\Remote;
 
 final class RemoteSqlPhpCodeBuilder
 {
+    use RemoteSnippetMixins;
+
     private const SNIPPET_PATH = __DIR__ . '/../../Resources/Snippets/remote_sql_query.php';
 
     public function build(string $sql, int $page, int $size): string
@@ -24,6 +26,6 @@ final class RemoteSqlPhpCodeBuilder
 
         $code = strtr($snippet, $replacements);
 
-        return preg_replace('/^<\?php\s*/', '', $code, 1) ?? $code;
+        return $this->withSnippetMixins($code);
     }
 }

@@ -67,13 +67,7 @@ try {
         throw new \RuntimeException('Не удалось сериализовать настройку в JSON.');
     }
 
-    echo json_encode([
-        'ok' => true,
-        'result' => $line,
-    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    echo CommandResult::success($line);
 } catch (\Throwable $err) {
-    echo json_encode([
-        'ok' => false,
-        'error' => $err->getMessage(),
-    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    echo CommandResult::error($err->getMessage());
 }
