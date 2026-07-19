@@ -6,6 +6,8 @@ namespace ModernBx\Cli\App\Service\Remote;
 
 final class RemoteSitePhpCodeBuilder
 {
+    use RemoteSnippetMixins;
+
     private const SNIPPET_DIR = __DIR__ . '/../../Resources/Snippets';
 
     /** @param array<string, mixed> $query */
@@ -46,6 +48,6 @@ final class RemoteSitePhpCodeBuilder
 
         $code = strtr($snippet, $replacements);
 
-        return preg_replace('/^<\?php\s*/', '', $code, 1) ?? $code;
+        return $this->withSnippetMixins($code);
     }
 }

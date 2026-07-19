@@ -36,6 +36,7 @@ class ListCommand extends BxCommand
             ->setDescription('Выводит список файлов из файловой структуры проекта')
             ->setHelp('Expr может быть путем к директории или glob-выражением относительно document root.')
             ->addOption('remote', null, InputOption::VALUE_REQUIRED, 'Кодовое имя удаленного проекта')
+            ->addOption('local', null, InputOption::VALUE_NONE, 'Отключить неявный remote текущей сессии')
             ->addOption('short', null, InputOption::VALUE_NONE, 'Вывести только короткие имена файлов')
             ->addArgument('expr', InputArgument::REQUIRED, 'Путь к директории или glob-выражение');
     }

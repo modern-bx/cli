@@ -39,6 +39,7 @@ class GetCommand extends BxCommand
             ->setDescription('Скачивает файл из файловой структуры проекта')
             ->setHelp('Команда копирует файл относительно document root локального или удаленного проекта.')
             ->addOption('remote', null, InputOption::VALUE_REQUIRED, 'Кодовое имя удаленного проекта')
+            ->addOption('local', null, InputOption::VALUE_NONE, 'Отключить неявный remote текущей сессии')
             ->addArgument('src', InputArgument::REQUIRED, 'Путь к файлу относительно document root проекта')
             ->addArgument('dest', InputArgument::REQUIRED, 'Локальный путь назначения');
     }

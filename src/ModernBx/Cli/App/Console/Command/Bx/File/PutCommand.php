@@ -36,6 +36,7 @@ class PutCommand extends AppCommand
             ->setDescription('Загружает локальный файл в файловую структуру удаленного проекта')
             ->setHelp('Команда загружает локальный файл в путь относительно document root удаленного проекта.')
             ->addOption('remote', null, InputOption::VALUE_REQUIRED, 'Кодовое имя удаленного проекта')
+            ->addOption('local', null, InputOption::VALUE_NONE, 'Отключить неявный remote текущей сессии')
             ->addOption('force', null, InputOption::VALUE_NONE, 'Удалить удаленный файл перед загрузкой')
             ->addArgument('src', InputArgument::REQUIRED, 'Путь к локальному файлу')
             ->addArgument('dest', InputArgument::REQUIRED, 'Удаленный путь относительно document root проекта');

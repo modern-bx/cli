@@ -39,7 +39,8 @@ class ExecCommand extends KernelCommand
         $this
             ->setDescription($this->trans('command.php_exec.description'))
             ->setHelp($this->trans('command.php_exec.help'))
-            ->addOption('remote', null, InputOption::VALUE_REQUIRED, 'Кодовое имя удаленного проекта');
+            ->addOption('remote', null, InputOption::VALUE_REQUIRED, 'Кодовое имя удаленного проекта')
+            ->addOption('local', null, InputOption::VALUE_NONE, 'Отключить неявный remote текущей сессии');
     }
 
     /**

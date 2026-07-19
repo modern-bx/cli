@@ -6,6 +6,10 @@ namespace ModernBx\Cli\App\Console\Command\Bx\Setting;
 
 use ModernBx\Cli\App\Console\Command\BxCommand;
 use ModernBx\Cli\App\Console\Mixin\Bx\SettingFile;
+use ModernBx\Cli\App\Service\Remote\BitrixAdminClient;
+use ModernBx\Cli\App\Service\Remote\RemotePhpTrait;
+use ModernBx\Cli\App\Service\Remote\RemoteProjectConfigManager;
+use ModernBx\Cli\App\Service\Remote\RemoteSettingPhpCodeBuilder;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputDefinition;
 use Symfony\Component\Console\Input\InputInterface;
@@ -17,6 +21,22 @@ use function ModernBx\CommonFunctions\to_json;
 class GetCommand extends BxCommand
 {
     use SettingFile;
+    use RemotePhpTrait;
+
+    private RemoteSettingPhpCodeBuilder $remoteSettingPhpCodeBuilder;
+
+    public function __construct(
+        RemoteProjectConfigManager $remoteProjectConfigManager,
+        BitrixAdminClient $bitrixAdminClient,
+        RemoteSettingPhpCodeBuilder $remoteSettingPhpCodeBuilder
+    ) {
+        parent::__construct();
+
+        $this->remoteProjectConfigManager = $remoteProjectConfigManager;
+        $this->bitrixAdminClient = $bitrixAdminClient;
+        $this->remoteSettingPhpCodeBuilder = $remoteSettingPhpCodeBuilder;
+    }
+
     /**
      * @var string
      */
@@ -29,6 +49,18 @@ class GetCommand extends BxCommand
             ->setHelp($this->trans("command.setting_get.help"))
             ->setDefinition(
                 new InputDefinition([
+                    new InputOption(
+                        'remote',
+                        null,
+                        InputOption::VALUE_REQUIRED,
+                        'Кодовое имя удаленного проекта',
+                    ),
+                    new InputOption(
+                        'local',
+                        null,
+                        InputOption::VALUE_NONE,
+                        'Отключить неявный remote текущей сессии',
+                    ),
                     new InputOption(
                         'extra',
                         null,
@@ -58,6 +90,15 @@ class GetCommand extends BxCommand
      */
     protected function executeInternal(InputInterface $input, OutputInterface $output): void
     {
+        $remote = $input->getOption('remote');
+
+        if (is_string($remote)) {
+            $this->printer = $this->getPrinter($output);
+            $this->verbose = $input->getOption('verbose') !== false;
+            $this->executeRemote($input, $remote);
+            return;
+        }
+
         parent::executeInternal($input, $output);
 
         $file = $this->getSettingsFile((bool) $input->getOption("extra"));
@@ -76,5 +117,33 @@ class GetCommand extends BxCommand
         }
 
         $this->printer->info((string) to_json($value, $flags));
+    }
+
+    /**
+     * @throws \Exception
+     */
+    protected function executeRemote(InputInterface $input, string $remote): void
+    {
+        $path = $input->getArgument("path");
+
+        if (!is_string($path)) {
+            throw new \Exception($this->trans("error.setting.path_string"), static::CODE_INVALID_ARGUMENT_VALUE);
+        }
+
+        $flags = JSON_UNESCAPED_UNICODE;
+
+        if ($input->getOption("pretty")) {
+            $flags |= JSON_PRETTY_PRINT;
+        }
+
+        $line = $this->decodeRemoteJsonResult(
+            $this->executeRemotePhp(
+                $remote,
+                $this->remoteSettingPhpCodeBuilder->buildGet((bool) $input->getOption("extra"), $path, $flags)
+            ),
+            'Не удалось получить настройку удаленного проекта.',
+        );
+
+        $this->printer->info(is_scalar($line) ? (string) $line : '');
     }
 }
