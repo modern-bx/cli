@@ -7,6 +7,7 @@ namespace ModernBx\Cli\App\Console\Command\Bx\File;
 use ModernBx\Cli\App\Console\Command\BxCommand;
 use ModernBx\Cli\App\Service\Remote\BitrixAdminClient;
 use ModernBx\Cli\App\Service\Remote\RemoteProjectConfigManager;
+use ModernBx\Cli\App\Service\Remote\RemoteFileApplyPhpCodeBuilder;
 use Symfony\Component\Console\Helper\ProgressBar;
 use Symfony\Component\Console\Helper\QuestionHelper;
 use Symfony\Component\Console\Input\InputArgument;
@@ -25,14 +26,18 @@ class ApplyCommand extends BxCommand
 
     protected BitrixAdminClient $bitrixAdminClient;
 
+    protected RemoteFileApplyPhpCodeBuilder $remoteFileApplyPhpCodeBuilder;
+
     public function __construct(
         RemoteProjectConfigManager $remoteProjectConfigManager,
-        BitrixAdminClient $bitrixAdminClient
+        BitrixAdminClient $bitrixAdminClient,
+        RemoteFileApplyPhpCodeBuilder $remoteFileApplyPhpCodeBuilder
     ) {
         parent::__construct();
 
         $this->remoteProjectConfigManager = $remoteProjectConfigManager;
         $this->bitrixAdminClient = $bitrixAdminClient;
+        $this->remoteFileApplyPhpCodeBuilder = $remoteFileApplyPhpCodeBuilder;
     }
 
     protected function configure(): void
@@ -311,101 +316,15 @@ class ApplyCommand extends BxCommand
         array $plan,
         bool $force
     ): array {
-        $payload = json_encode([
-            'dest' => $dest,
-            'directories' => $plan['directories'],
-            'files' => array_map(static fn (array $file): array => [
+        $code = $this->remoteFileApplyPhpCodeBuilder->buildDiagnose(
+            $dest,
+            $plan['directories'],
+            array_map(static fn (array $file): array => [
                 'relative' => $file['relative'],
                 'size' => $file['size'],
             ], $plan['files']),
-            'force' => $force,
-        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-
-        if (!is_string($payload)) {
-            throw new \RuntimeException('Не удалось подготовить диагностику удаленного проекта.');
-        }
-
-        $code = str_replace('__PAYLOAD__', base64_encode($payload), <<<'PHP'
-$payload = base64_decode('__PAYLOAD__', true);
-$data = is_string($payload) ? json_decode($payload, true) : null;
-
-if (!is_array($data)) {
-    echo json_encode(['ok' => false, 'error' => 'Некорректные данные диагностики.'], JSON_UNESCAPED_UNICODE);
-    return;
-}
-
-$documentRoot = rtrim((string) ($_SERVER['DOCUMENT_ROOT'] ?? ''), '/');
-
-if ($documentRoot === '') {
-    echo json_encode([
-        'ok' => false,
-        'error' => 'Не удалось определить document root удаленного проекта.',
-    ], JSON_UNESCAPED_UNICODE);
-    return;
-}
-
-$join = static function (string $dest, string $relative): string {
-    return '/' . trim(trim($dest, '/') . '/' . trim($relative, '/'), '/');
-};
-$formatBytes = static function (int $bytes): string {
-    $units = ['байт', 'КБ', 'МБ', 'ГБ'];
-    $value = (float) $bytes;
-
-    foreach ($units as $index => $unit) {
-        if ($value < 1024 || $index === count($units) - 1) {
-            return $index === 0
-                ? $bytes . ' ' . $unit
-                : rtrim(rtrim(number_format($value, 1, '.', ''), '0'), '.') . ' ' . $unit;
-        }
-
-        $value /= 1024;
-    }
-
-    return $bytes . ' байт';
-};
-$notices = [];
-$errors = [];
-$dest = (string) ($data['dest'] ?? '');
-$force = ($data['force'] ?? false) === true;
-
-foreach (($data['directories'] ?? []) as $directory) {
-    if (!is_string($directory)) {
-        continue;
-    }
-
-    $target = $join($dest, $directory);
-    $fullTarget = $documentRoot . $target;
-
-    if (is_dir($fullTarget)) {
-        $notices[] = 'Директория уже существует: ' . $target;
-    } elseif (file_exists($fullTarget)) {
-        $errors[] = 'На месте директории существует файл: ' . $target;
-    }
-}
-
-foreach (($data['files'] ?? []) as $file) {
-    if (!is_array($file) || !is_string($file['relative'] ?? null)) {
-        continue;
-    }
-
-    $size = (int) ($file['size'] ?? 0);
-    $target = $join($dest, $file['relative']);
-    $fullTarget = $documentRoot . $target;
-    $message = 'Файл уже существует: ' . $target . ' (' . $formatBytes($size) . ' (' . $size . ' байт))';
-
-    if (is_file($fullTarget)) {
-        $force ? $notices[] = $message : $errors[] = $message;
-    } elseif (is_dir($fullTarget)) {
-        $errors[] = 'На месте файла существует директория: ' . $target;
-    }
-}
-
-echo json_encode([
-    'ok' => true,
-    'notices' => $notices,
-    'errors' => $errors,
-], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-PHP);
+            $force,
+        );
         $json = $this->bitrixAdminClient->executePhp($endpoint, $sessionId, $code);
         $result = json_decode($json, true);
 
@@ -499,64 +418,7 @@ PHP);
         string $dest,
         array $directories
     ): int {
-        $payload = json_encode(
-            ['dest' => $dest, 'directories' => $directories],
-            JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES,
-        );
-
-        if (!is_string($payload)) {
-            throw new \RuntimeException('Не удалось подготовить создание директорий удаленного проекта.');
-        }
-
-        $code = str_replace('__PAYLOAD__', base64_encode($payload), <<<'PHP'
-$payload = base64_decode('__PAYLOAD__', true);
-$data = is_string($payload) ? json_decode($payload, true) : null;
-
-if (!is_array($data)) {
-    echo json_encode(['ok' => false, 'error' => 'Некорректные данные директорий.'], JSON_UNESCAPED_UNICODE);
-    return;
-}
-
-$documentRoot = rtrim((string) ($_SERVER['DOCUMENT_ROOT'] ?? ''), '/');
-
-if ($documentRoot === '') {
-    echo json_encode([
-        'ok' => false,
-        'error' => 'Не удалось определить document root удаленного проекта.',
-    ], JSON_UNESCAPED_UNICODE);
-    return;
-}
-
-$join = static function (string $dest, string $relative): string {
-    return '/' . trim(trim($dest, '/') . '/' . trim($relative, '/'), '/');
-};
-$created = 0;
-
-foreach (($data['directories'] ?? []) as $directory) {
-    if (!is_string($directory)) {
-        continue;
-    }
-
-    $target = $join((string) ($data['dest'] ?? ''), $directory);
-    $fullTarget = $documentRoot . $target;
-
-    if (is_dir($fullTarget)) {
-        continue;
-    }
-
-    if (!mkdir($fullTarget, 0775, true) && !is_dir($fullTarget)) {
-        echo json_encode([
-            'ok' => false,
-            'error' => 'Не удалось создать директорию: ' . $target,
-        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-        return;
-    }
-
-    $created++;
-}
-
-echo json_encode(['ok' => true, 'created' => $created], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-PHP);
+        $code = $this->remoteFileApplyPhpCodeBuilder->buildCreateDirectories($dest, $directories);
         $json = $this->bitrixAdminClient->executePhp($endpoint, $sessionId, $code);
         $result = json_decode($json, true);
 
