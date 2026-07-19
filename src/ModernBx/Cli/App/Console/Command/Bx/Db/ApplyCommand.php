@@ -53,7 +53,7 @@ class ApplyCommand extends DbCommand
                 new InputDefinition([
                     new InputArgument(
                         'file',
-                        InputArgument::REQUIRED,
+                        InputArgument::OPTIONAL,
                         $this->trans('argument.db_apply.file'),
                     ),
                     new InputOption('remote', null, InputOption::VALUE_REQUIRED, 'Кодовое имя удаленного проекта'),
@@ -72,15 +72,22 @@ class ApplyCommand extends DbCommand
     {
         $file = $input->getArgument('file');
 
-        if (!is_string($file) || $file === '') {
+        if ($file !== null && (!is_string($file) || $file === '')) {
             throw new \Exception($this->trans('error.db_apply.file_string'), static::CODE_INVALID_ARGUMENT_VALUE);
+        }
+
+        $sql = $this->readSql($file);
+
+        if (trim($sql) === '') {
+            $this->printer->put('SQL input is empty.', 'comment');
+            return;
         }
 
         $remote = $input->getOption('remote');
 
         if (is_string($remote)) {
-            $this->executeRemote($remote, $file);
-            $this->printer->info($this->trans('message.db_apply.applied', ['%file%' => $file]));
+            $this->executeRemote($remote, $sql);
+            $this->printer->info($this->trans('message.db_apply.applied', ['%file%' => $file ?? 'stdin']));
             return;
         }
 
@@ -89,15 +96,25 @@ class ApplyCommand extends DbCommand
         $config = $this->getConnectionConfig();
 
         if ($config['type'] === 'postgres') {
-            $this->pgSqlExecutor->apply($config, $file);
+            $this->pgSqlExecutor->execute($config, $sql);
         } else {
-            $this->mySqlExecutor->apply($config, $file);
+            $this->mySqlExecutor->execute($config, $sql);
         }
-        $this->printer->info($this->trans('message.db_apply.applied', ['%file%' => $file]));
+        $this->printer->info($this->trans('message.db_apply.applied', ['%file%' => $file ?? 'stdin']));
     }
 
-    protected function executeRemote(string $remote, string $file): void
+    protected function executeRemote(string $remote, string $sql): void
     {
+        $json = $this->executeRemotePhp($remote, $this->remoteDbPhpCodeBuilder->buildApply($sql));
+        $this->decodeRemoteJsonResult($json, 'Не удалось применить SQL-файл на удаленном проекте.');
+    }
+
+    protected function readSql(mixed $file): string
+    {
+        if ($file === null) {
+            return (string) stream_get_contents(STDIN);
+        }
+
         if (!is_file($file) || !is_readable($file)) {
             throw new \Exception('SQL file is not readable: ' . $file);
         }
@@ -108,7 +125,6 @@ class ApplyCommand extends DbCommand
             throw new \Exception('Unable to read SQL file: ' . $file);
         }
 
-        $json = $this->executeRemotePhp($remote, $this->remoteDbPhpCodeBuilder->buildApply($sql));
-        $this->decodeRemoteJsonResult($json, 'Не удалось применить SQL-файл на удаленном проекте.');
+        return $sql;
     }
 }

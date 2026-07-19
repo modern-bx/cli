@@ -53,7 +53,7 @@ class DumpCommand extends DbCommand
                 new InputDefinition([
                     new InputArgument(
                         'file',
-                        InputArgument::REQUIRED,
+                        InputArgument::OPTIONAL,
                         $this->trans('argument.db_dump.file'),
                     ),
                     new InputOption(
@@ -78,7 +78,7 @@ class DumpCommand extends DbCommand
     {
         $file = $input->getArgument('file');
 
-        if (!is_string($file) || $file === '') {
+        if ($file !== null && (!is_string($file) || $file === '')) {
             throw new \Exception($this->trans('error.db_dump.file_string'), static::CODE_INVALID_ARGUMENT_VALUE);
         }
 
@@ -86,32 +86,40 @@ class DumpCommand extends DbCommand
         $remote = $input->getOption('remote');
 
         if (is_string($remote)) {
-            $this->executeRemote($remote, $file, $tables);
-            $this->printer->info($this->trans('message.db_dump.created', ['%file%' => $file]));
+            $dump = $this->executeRemote($remote, $tables);
+            $this->writeDump($output, $file, $dump);
             return;
         }
 
         parent::executeInternal($input, $output);
 
         $config = $this->getConnectionConfig();
+        $outputFile = $file ?? $this->createTempDumpFile();
 
         if ($config['type'] === 'postgres') {
-            $this->pgSqlDumper->dump($config, $file, $tables);
+            $this->pgSqlDumper->dump($config, $outputFile, $tables);
         } else {
-            $this->mySqlDumper->dump($config, $file, $tables);
+            $this->mySqlDumper->dump($config, $outputFile, $tables);
         }
+
+        if ($file === null) {
+            $dump = file_get_contents($outputFile);
+            @unlink($outputFile);
+
+            if ($dump === false) {
+                throw new \Exception('Unable to read dump file: ' . $outputFile);
+            }
+
+            $output->write($dump);
+            return;
+        }
+
         $this->printer->info($this->trans('message.db_dump.created', ['%file%' => $file]));
     }
 
     /** @param array<int, string>|null $tables */
-    protected function executeRemote(string $remote, string $file, ?array $tables): void
+    protected function executeRemote(string $remote, ?array $tables): string
     {
-        $directory = dirname($file);
-
-        if (!is_dir($directory) && !mkdir($directory, 0775, true) && !is_dir($directory)) {
-            throw new \Exception('Unable to create dump directory: ' . $directory);
-        }
-
         $json = $this->executeRemotePhp($remote, $this->remoteDbPhpCodeBuilder->buildDump($tables));
         $dump = $this->decodeRemoteJsonResult($json, 'Не удалось создать дамп базы данных удаленного проекта.');
 
@@ -119,8 +127,37 @@ class DumpCommand extends DbCommand
             throw new \RuntimeException('Удаленная PHP-консоль вернула некорректный дамп базы данных.');
         }
 
+        return $dump;
+    }
+
+    protected function writeDump(OutputInterface $output, mixed $file, string $dump): void
+    {
+        if ($file === null) {
+            $output->write($dump);
+            return;
+        }
+
+        $directory = dirname($file);
+
+        if (!is_dir($directory) && !mkdir($directory, 0775, true) && !is_dir($directory)) {
+            throw new \Exception('Unable to create dump directory: ' . $directory);
+        }
+
         if (file_put_contents($file, $dump) === false) {
             throw new \Exception('Unable to write dump file: ' . $file);
         }
+
+        $this->printer->info($this->trans('message.db_dump.created', ['%file%' => $file]));
+    }
+
+    protected function createTempDumpFile(): string
+    {
+        $file = tempnam(sys_get_temp_dir(), 'bx-cli-db-dump-');
+
+        if ($file === false) {
+            throw new \Exception('Unable to create temporary dump file.');
+        }
+
+        return $file;
     }
 }
