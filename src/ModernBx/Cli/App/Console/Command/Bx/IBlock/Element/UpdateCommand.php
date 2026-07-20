@@ -51,7 +51,7 @@ class UpdateCommand extends KernelCommand
                 new InputArgument('ID', InputArgument::REQUIRED, $this->trans('argument.iblock_element.id')),
                 new InputArgument(
                     'fields',
-                    InputArgument::REQUIRED,
+                    InputArgument::OPTIONAL,
                     $this->trans('argument.iblock_element.update_fields')
                 ),
             ]));
@@ -116,14 +116,7 @@ class UpdateCommand extends KernelCommand
             );
         }
 
-        if (!is_string($fields)) {
-            throw new \Exception(
-                $this->trans('error.iblock_element.update_json_string'),
-                static::CODE_INVALID_ARGUMENT_VALUE
-            );
-        }
-
-        $decodedFields = $this->decodeFields($fields);
+        $decodedFields = $this->decodeFields($this->readFieldsArgumentOrStdin($fields));
         $this->validateFields($decodedFields);
 
         return [(int) $id, $decodedFields];

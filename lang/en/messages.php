@@ -108,12 +108,16 @@ return [
     'command.iblock_element_update.help' => 'Update Bitrix iblock element fields using legacy ' .
         'CIBlockElement::Update API without PROPERTY_VALUES.',
     'argument.iblock_element.id' => 'Iblock element ID',
-    'argument.iblock_element.add_fields' => 'JSON object with CIBlockElement::Add fields without PROPERTY_VALUES',
-    'argument.iblock_element.update_fields' => 'JSON object with CIBlockElement::Update fields without PROPERTY_VALUES',
+    'argument.iblock_element.add_fields' => 'JSON object with CIBlockElement::Add fields without PROPERTY_VALUES; ' .
+        'read from stdin when omitted',
+    'argument.iblock_element.update_fields' => 'JSON object with CIBlockElement::Update fields ' .
+        'without PROPERTY_VALUES; read from stdin when omitted',
     'error.iblock_element.id_positive' => 'Iblock element ID must be a positive integer.',
     'error.iblock_element.not_found' => 'Iblock element with ID %id% was not found.',
     'error.iblock_element.add_failed' => 'Failed to add iblock element.',
     'error.iblock_element.delete_failed' => 'Failed to delete iblock element.',
+    'error.iblock_element.fields_required' => 'Iblock element fields JSON must be passed as an argument ' .
+        'or through stdin.',
     'error.iblock_element.update_json_string' => 'Iblock element update fields must be a JSON object string.',
     'error.iblock_element.update_invalid_json' => 'Iblock element update fields contain invalid JSON: %message%',
     'error.iblock_element.update_object' => 'Iblock element update fields must be a JSON object.',

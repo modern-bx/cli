@@ -110,12 +110,16 @@ return [
     'command.iblock_element_update.help' => 'Обновляет поля элемента инфоблока через старый API ' .
         'CIBlockElement::Update без PROPERTY_VALUES.',
     'argument.iblock_element.id' => 'ID элемента инфоблока',
-    'argument.iblock_element.add_fields' => 'JSON-объект с полями для CIBlockElement::Add без PROPERTY_VALUES',
-    'argument.iblock_element.update_fields' => 'JSON-объект с полями для CIBlockElement::Update без PROPERTY_VALUES',
+    'argument.iblock_element.add_fields' => 'JSON-объект с полями для CIBlockElement::Add ' .
+        'без PROPERTY_VALUES; если не указан, читается stdin',
+    'argument.iblock_element.update_fields' => 'JSON-объект с полями для CIBlockElement::Update ' .
+        'без PROPERTY_VALUES; если не указан, читается stdin',
     'error.iblock_element.id_positive' => 'ID элемента инфоблока должен быть положительным целым числом.',
     'error.iblock_element.not_found' => 'Элемент инфоблока с ID %id% не найден.',
     'error.iblock_element.add_failed' => 'Не удалось добавить элемент инфоблока.',
     'error.iblock_element.delete_failed' => 'Не удалось удалить элемент инфоблока.',
+    'error.iblock_element.fields_required' => 'JSON с полями элемента инфоблока должен быть передан ' .
+        'аргументом или через stdin.',
     'error.iblock_element.update_json_string' => 'Поля обновления элемента инфоблока должны быть JSON-строкой объекта.',
     'error.iblock_element.update_invalid_json' => 'Поля обновления элемента инфоблока содержат некорректный JSON: ' .
         '%message%',

@@ -50,7 +50,7 @@ class AddCommand extends KernelCommand
                 new InputOption('local', null, InputOption::VALUE_NONE, 'Отключить неявный remote текущей сессии'),
                 new InputArgument(
                     'fields',
-                    InputArgument::REQUIRED,
+                    InputArgument::OPTIONAL,
                     $this->trans('argument.iblock_element.add_fields')
                 ),
             ]));
@@ -118,14 +118,7 @@ class AddCommand extends KernelCommand
     {
         $fields = $input->getArgument('fields');
 
-        if (!is_string($fields)) {
-            throw new \Exception(
-                $this->trans('error.iblock_element.update_json_string'),
-                static::CODE_INVALID_ARGUMENT_VALUE
-            );
-        }
-
-        $decodedFields = $this->decodeFields($fields);
+        $decodedFields = $this->decodeFields($this->readFieldsArgumentOrStdin($fields));
         $this->validateFields($decodedFields);
 
         return $decodedFields;

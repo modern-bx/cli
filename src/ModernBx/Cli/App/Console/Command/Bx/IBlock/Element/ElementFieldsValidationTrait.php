@@ -8,6 +8,38 @@ use ModernBx\Cli\App\Validation\JsonSchemaValidator;
 
 trait ElementFieldsValidationTrait
 {
+    private function readFieldsArgumentOrStdin(mixed $fields): string
+    {
+        if (is_string($fields)) {
+            return $fields;
+        }
+
+        if ($fields !== null) {
+            throw new \Exception(
+                $this->trans('error.iblock_element.update_json_string'),
+                static::CODE_INVALID_ARGUMENT_VALUE
+            );
+        }
+
+        $stdinIsTty = function_exists('posix_isatty') && posix_isatty(STDIN);
+        if ($stdinIsTty) {
+            throw new \Exception(
+                $this->trans('error.iblock_element.fields_required'),
+                static::CODE_INVALID_ARGUMENT_VALUE
+            );
+        }
+
+        $stdin = stream_get_contents(STDIN);
+        if (!is_string($stdin) || trim($stdin) === '') {
+            throw new \Exception(
+                $this->trans('error.iblock_element.fields_required'),
+                static::CODE_INVALID_ARGUMENT_VALUE
+            );
+        }
+
+        return $stdin;
+    }
+
     /** @return array<string, mixed> */
     private function decodeFields(string $fields): array
     {
