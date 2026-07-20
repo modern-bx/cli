@@ -3,9 +3,6 @@
 /** @var int $id ID элемента инфоблока. */
 $id = 0;
 
-/** @var int $jsonFlags Флаги json_encode для вывода полей элемента. */
-$jsonFlags = JSON_UNESCAPED_UNICODE;
-
 try {
     if (!class_exists('\Bitrix\Main\Loader') || !\Bitrix\Main\Loader::includeModule('iblock')) {
         throw new \RuntimeException('Не удалось подключить модуль iblock.');
@@ -42,13 +39,8 @@ try {
         unset($fields[$field]);
     }
 
-    $line = json_encode($fields, $jsonFlags);
-    if (!is_string($line)) {
-        throw new \RuntimeException('Не удалось сериализовать поля элемента инфоблока в JSON.');
-    }
-
     /** @phpstan-ignore-next-line */
-    echo CommandResult::success($line);
+    echo CommandResult::success($fields);
 } catch (\Throwable $err) {
     /** @phpstan-ignore-next-line */
     echo CommandResult::error($err->getMessage());

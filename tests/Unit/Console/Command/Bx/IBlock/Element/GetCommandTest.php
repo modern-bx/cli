@@ -10,6 +10,7 @@ use ModernBx\Cli\App\Service\Remote\BitrixAdminClient;
 use ModernBx\Cli\App\Service\Remote\RemoteIBlockElementPhpCodeBuilder;
 use ModernBx\Cli\App\Service\Remote\RemoteProjectConfigManager;
 use PHPUnit\Framework\TestCase;
+use Symfony\Component\Console\Input\ArrayInput;
 
 final class GetCommandTest extends TestCase
 {
@@ -32,7 +33,35 @@ final class GetCommandTest extends TestCase
         ], $method->invoke($this->createCommand(), $fields));
     }
 
-    private function createCommand(): GetCommand
+    public function testRemoteModeReceivesNormalizedFieldsArrayAndFormatsLocally(): void
+    {
+        $command = $this->createCommand();
+        $command->remoteResponses[] = json_encode([
+            'ok' => true,
+            'result' => [
+                'ID' => '17',
+                'WF_COMMENTS' => null,
+            ],
+        ], JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE);
+
+        $input = new ArrayInput([
+            'ID' => '17',
+            '--pretty' => true,
+        ], $command->getDefinition());
+        $input->setInteractive(false);
+
+        $output = $command->runRemote($input, 'prod');
+
+        self::assertSame(json_encode([
+            'ID' => '17',
+            'WF_COMMENTS' => null,
+        ], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT) . PHP_EOL, $output);
+        self::assertCount(1, $command->remoteExecutions);
+        self::assertStringContainsString('CIBlockElement::GetList', $command->remoteExecutions[0]['code']);
+        self::assertStringNotContainsString('$jsonFlags', $command->remoteExecutions[0]['code']);
+    }
+
+    private function createCommand(): TestableIBlockElementGetCommand
     {
         $reflection = new \ReflectionClass(ClassAliasLoader::class);
         $aliasLoader = $reflection->newInstanceWithoutConstructor();
@@ -41,7 +70,7 @@ final class GetCommandTest extends TestCase
         $reflection = new \ReflectionClass(BitrixAdminClient::class);
         $client = $reflection->newInstanceWithoutConstructor();
 
-        return new GetCommand(
+        return new TestableIBlockElementGetCommand(
             $aliasLoader,
             $configManager,
             $client,

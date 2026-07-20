@@ -100,12 +100,17 @@ class GetCommand extends KernelCommand
         $id = $this->getElementId($input);
         $flags = $this->getJsonFlags($input);
 
-        $line = $this->decodeRemoteJsonResult(
-            $this->executeRemotePhp($remote, $this->remoteIBlockElementPhpCodeBuilder->buildGet($id, $flags)),
+        $fields = $this->decodeRemoteJsonResult(
+            $this->executeRemotePhp($remote, $this->remoteIBlockElementPhpCodeBuilder->buildGet($id)),
             'Не удалось получить элемент инфоблока удаленного проекта.'
         );
 
-        $this->printer->info(is_scalar($line) ? (string) $line : '');
+        if (!is_array($fields)) {
+            throw new \RuntimeException('Удаленная PHP-консоль вернула некорректные поля элемента инфоблока.');
+        }
+
+        /** @var array<string, mixed> $fields */
+        $this->printer->info((string) to_json($fields, $flags));
     }
 
     private function getElementId(InputInterface $input): int
