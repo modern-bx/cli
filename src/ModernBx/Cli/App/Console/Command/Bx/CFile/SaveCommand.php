@@ -4,7 +4,7 @@
 
 declare(strict_types=1);
 
-namespace ModernBx\Cli\App\Console\Command\Bx\File;
+namespace ModernBx\Cli\App\Console\Command\Bx\CFile;
 
 use ModernBx\Cli\App\Console\Command\Bx\KernelCommand;
 use ModernBx\Cli\App\Service\ClassAliasLoader;
@@ -23,7 +23,7 @@ class SaveCommand extends KernelCommand
 {
     use RemotePhpTrait;
 
-    protected static $defaultName = 'file:save';
+    protected static $defaultName = 'cfile:save';
 
     protected RemoteFilePhpCodeBuilder $remoteFilePhpCodeBuilder;
 
