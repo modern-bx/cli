@@ -137,7 +137,19 @@ class SaveCommand extends KernelCommand
             return;
         }
 
-        $this->printer->info((string) to_json($row, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+        $this->printer->info($this->encodeFileRow($row));
+    }
+
+    /** @param array<string, mixed> $row */
+    protected function encodeFileRow(array $row): string
+    {
+        $flags = JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES;
+
+        if (defined('JSON_INVALID_UTF8_SUBSTITUTE')) {
+            $flags |= JSON_INVALID_UTF8_SUBSTITUTE;
+        }
+
+        return (string) to_json($row, $flags);
     }
 
     protected function normalizeProjectPath(string $path): string
@@ -189,6 +201,31 @@ class SaveCommand extends KernelCommand
 <?php
 
 $path = '__BX_CLI_FILE_SAVE_PATH__';
+$bufferLevel = ob_get_level();
+ob_start();
+
+$send = static function (array $payload) use ($bufferLevel): void {
+    while (ob_get_level() > $bufferLevel) {
+        ob_end_clean();
+    }
+
+    $flags = JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES;
+
+    if (defined('JSON_INVALID_UTF8_SUBSTITUTE')) {
+        $flags |= JSON_INVALID_UTF8_SUBSTITUTE;
+    }
+
+    $json = json_encode($payload, $flags);
+
+    if (!is_string($json)) {
+        $json = json_encode([
+            'ok' => false,
+            'error' => 'Не удалось сериализовать результат file:save: ' . json_last_error_msg(),
+        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    }
+
+    echo is_string($json) ? $json : '{"ok":false,"error":"Unable to encode file:save result."}';
+};
 
 try {
     $documentRoot = rtrim((string) ($_SERVER['DOCUMENT_ROOT'] ?? ''), '/');
@@ -231,9 +268,9 @@ try {
         throw new \RuntimeException('Не удалось получить строку b_file для ID ' . $id . '.');
     }
 
-    echo json_encode(['ok' => true, 'result' => $row], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    $send(['ok' => true, 'result' => $row]);
 } catch (\Throwable $err) {
-    echo json_encode(['ok' => false, 'error' => $err->getMessage()], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    $send(['ok' => false, 'error' => $err->getMessage()]);
 }
 PHP_REMOTE, [
             "'__BX_CLI_FILE_SAVE_PATH__'" => var_export($path, true),
