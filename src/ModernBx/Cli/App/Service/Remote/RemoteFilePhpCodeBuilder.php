@@ -40,6 +40,21 @@ final class RemoteFilePhpCodeBuilder
         ]);
     }
 
+    public function buildSave(string $path): string
+    {
+        return strtr($this->build('remote_file_save.php'), [
+            "'__REMOTE_FILE_SAVE_PATH__'" => var_export(json_encode($path), true),
+        ]);
+    }
+
+    public function buildCFileDelete(int $id, bool $force): string
+    {
+        return strtr($this->build('remote_cfile_delete.php'), [
+            '$id = random_int(1, PHP_INT_MAX);' => '$id = ' . $id . ';',
+            '$force = random_int(0, 1) === 1;' => '$force = ' . var_export($force, true) . ';',
+        ]);
+    }
+
     /** @param string[] $chunks */
     public function buildMergeChunks(string $destination, array $chunks): string
     {

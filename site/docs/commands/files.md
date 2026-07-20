@@ -63,6 +63,28 @@ php cli.phar file:apply --remote=prod --force --yes ./dist local/templates/site/
 php cli.phar file:apply --remote=prod --chunk-size=5242880 ./dist local/templates/site/assets
 ```
 
+
+## `cfile:save [--remote=<codename>] [--local] [--short] <file>`
+
+Создаёт запись в таблице `b_file` для уже существующего файла через `CFile::MakeFileArray()` и `CFile::SaveFile()`. Путь задаётся относительно document root локального или удалённого проекта. По умолчанию команда выводит JSON-объект со всеми полями созданной строки `b_file`, а с опцией `--short` — только ID.
+
+```bash
+php cli.phar cfile:save upload/logo.png
+php cli.phar cfile:save --short upload/logo.png
+php cli.phar cfile:save --remote=prod upload/logo.png
+```
+
+
+## `cfile:delete [--remote=<codename>] [--local] [--force] <ID>`
+
+Удаляет файл по ID через `CFile::Delete()`: запись удаляется из `b_file`, а связанный файл удаляется с диска штатной логикой Bitrix. Если ID не найден в `b_file`, без `--force` команда завершается ошибкой, а с `--force` ничего не делает.
+
+```bash
+php cli.phar cfile:delete 123
+php cli.phar cfile:delete --force 123
+php cli.phar cfile:delete --remote=prod 123
+```
+
 ## `file:mkdir [--remote=<codename>] [--local] <directory-path>`
 
 Создает директорию по пути относительно document root локального или удалённого проекта. Промежуточные директории в локальном режиме создаются автоматически.
