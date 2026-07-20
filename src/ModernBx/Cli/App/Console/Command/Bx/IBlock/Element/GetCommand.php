@@ -92,7 +92,7 @@ class GetCommand extends KernelCommand
             );
         }
 
-        $this->printer->info((string) to_json($element->GetFields(), $flags));
+        $this->printer->info((string) to_json($this->normalizeTildeFields($element->GetFields()), $flags));
     }
 
     protected function executeRemote(InputInterface $input, string $remote): void
@@ -131,5 +131,29 @@ class GetCommand extends KernelCommand
         }
 
         return $flags;
+    }
+
+    /**
+     * @param array<string, mixed> $fields
+     * @return array<string, mixed>
+     */
+    private function normalizeTildeFields(array $fields): array
+    {
+        foreach (array_keys($fields) as $field) {
+            if (!is_string($field) || !str_starts_with($field, '~')) {
+                continue;
+            }
+
+            $normalizedField = substr($field, 1);
+            if ($normalizedField === '') {
+                unset($fields[$field]);
+                continue;
+            }
+
+            $fields[$normalizedField] = $fields[$field];
+            unset($fields[$field]);
+        }
+
+        return $fields;
     }
 }

@@ -26,7 +26,23 @@ try {
         throw new \RuntimeException('Элемент инфоблока с ID ' . $id . ' не найден.');
     }
 
-    $line = json_encode($element->GetFields(), $jsonFlags);
+    $fields = $element->GetFields();
+    foreach (array_keys($fields) as $field) {
+        if (!is_string($field) || !str_starts_with($field, '~')) {
+            continue;
+        }
+
+        $normalizedField = substr($field, 1);
+        if ($normalizedField === '') {
+            unset($fields[$field]);
+            continue;
+        }
+
+        $fields[$normalizedField] = $fields[$field];
+        unset($fields[$field]);
+    }
+
+    $line = json_encode($fields, $jsonFlags);
     if (!is_string($line)) {
         throw new \RuntimeException('Не удалось сериализовать поля элемента инфоблока в JSON.');
     }
