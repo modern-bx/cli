@@ -9,6 +9,7 @@ namespace ModernBx\Cli\App\Console\Command\Bx\File;
 use ModernBx\Cli\App\Console\Command\Bx\KernelCommand;
 use ModernBx\Cli\App\Service\ClassAliasLoader;
 use ModernBx\Cli\App\Service\Remote\BitrixAdminClient;
+use ModernBx\Cli\App\Service\Remote\RemoteFilePhpCodeBuilder;
 use ModernBx\Cli\App\Service\Remote\RemotePhpTrait;
 use ModernBx\Cli\App\Service\Remote\RemoteProjectConfigManager;
 use Symfony\Component\Console\Input\InputArgument;
@@ -24,15 +25,19 @@ class SaveCommand extends KernelCommand
 
     protected static $defaultName = 'file:save';
 
+    protected RemoteFilePhpCodeBuilder $remoteFilePhpCodeBuilder;
+
     public function __construct(
         ClassAliasLoader $aliasLoader,
         RemoteProjectConfigManager $remoteProjectConfigManager,
-        BitrixAdminClient $bitrixAdminClient
+        BitrixAdminClient $bitrixAdminClient,
+        RemoteFilePhpCodeBuilder $remoteFilePhpCodeBuilder
     ) {
         parent::__construct($aliasLoader);
 
         $this->remoteProjectConfigManager = $remoteProjectConfigManager;
         $this->bitrixAdminClient = $bitrixAdminClient;
+        $this->remoteFilePhpCodeBuilder = $remoteFilePhpCodeBuilder;
     }
 
     protected function configure(): void
@@ -102,7 +107,7 @@ class SaveCommand extends KernelCommand
     protected function executeRemote(string $codename, string $path): array
     {
         $result = $this->decodeRemoteJsonResult(
-            $this->executeRemotePhp($codename, $this->buildRemoteSaveCode($path)),
+            $this->executeRemotePhp($codename, $this->remoteFilePhpCodeBuilder->buildSave($path)),
             'Не удалось сохранить файл удаленного проекта в b_file.',
         );
 
@@ -193,87 +198,5 @@ class SaveCommand extends KernelCommand
         if (!is_readable($absolutePath)) {
             throw new \RuntimeException(sprintf('Файл недоступен для чтения: %s', $path), static::CODE_IO_ERROR);
         }
-    }
-
-    protected function buildRemoteSaveCode(string $path): string
-    {
-        return strtr(<<<'PHP_REMOTE'
-<?php
-
-$path = '__BX_CLI_FILE_SAVE_PATH__';
-$bufferLevel = ob_get_level();
-ob_start();
-
-$send = static function (array $payload) use ($bufferLevel): void {
-    while (ob_get_level() > $bufferLevel) {
-        ob_end_clean();
-    }
-
-    $flags = JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES;
-
-    if (defined('JSON_INVALID_UTF8_SUBSTITUTE')) {
-        $flags |= JSON_INVALID_UTF8_SUBSTITUTE;
-    }
-
-    $json = json_encode($payload, $flags);
-
-    if (!is_string($json)) {
-        $json = json_encode([
-            'ok' => false,
-            'error' => 'Не удалось сериализовать результат file:save: ' . json_last_error_msg(),
-        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-    }
-
-    echo is_string($json) ? $json : '{"ok":false,"error":"Unable to encode file:save result."}';
-};
-
-try {
-    $documentRoot = rtrim((string) ($_SERVER['DOCUMENT_ROOT'] ?? ''), '/');
-
-    if ($documentRoot === '') {
-        throw new \RuntimeException('DOCUMENT_ROOT не определен.');
-    }
-
-    $absolutePath = $documentRoot . $path;
-
-    if (!is_file($absolutePath)) {
-        throw new \RuntimeException('Файл не найден: ' . $path);
-    }
-
-    if (!is_readable($absolutePath)) {
-        throw new \RuntimeException('Файл недоступен для чтения: ' . $path);
-    }
-
-    if (!class_exists('CFile')) {
-        throw new \RuntimeException('Класс CFile недоступен на удаленном проекте.');
-    }
-
-    $file = \CFile::MakeFileArray($absolutePath);
-
-    if (!is_array($file)) {
-        throw new \RuntimeException('Не удалось подготовить файл для сохранения: ' . $path);
-    }
-
-    $id = (int) \CFile::SaveFile($file, '');
-
-    if ($id <= 0) {
-        throw new \RuntimeException('Не удалось сохранить файл в b_file: ' . $path);
-    }
-
-    global $DB;
-    $dbResult = $DB->Query('SELECT * FROM b_file WHERE ID = ' . $id);
-    $row = is_object($dbResult) && method_exists($dbResult, 'Fetch') ? $dbResult->Fetch() : false;
-
-    if (!is_array($row)) {
-        throw new \RuntimeException('Не удалось получить строку b_file для ID ' . $id . '.');
-    }
-
-    $send(['ok' => true, 'result' => $row]);
-} catch (\Throwable $err) {
-    $send(['ok' => false, 'error' => $err->getMessage()]);
-}
-PHP_REMOTE, [
-            "'__BX_CLI_FILE_SAVE_PATH__'" => var_export($path, true),
-        ]);
     }
 }

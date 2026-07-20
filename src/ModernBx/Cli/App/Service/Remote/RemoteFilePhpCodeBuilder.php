@@ -40,6 +40,13 @@ final class RemoteFilePhpCodeBuilder
         ]);
     }
 
+    public function buildSave(string $path): string
+    {
+        return strtr($this->build('remote_file_save.php'), [
+            "'__REMOTE_FILE_SAVE_PATH__'" => var_export(json_encode($path), true),
+        ]);
+    }
+
     /** @param string[] $chunks */
     public function buildMergeChunks(string $destination, array $chunks): string
     {
