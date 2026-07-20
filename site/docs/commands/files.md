@@ -12,16 +12,17 @@ php cli.phar file:list --short 'upload/*.jpg'
 php cli.phar file:list --remote=prod bitrix/admin
 ```
 
-## `file:get [--remote=<codename>] [--local] <src> <dest>`
+## `file:get [--remote=<codename>] [--local] [--compress=zip] <src> <dest>`
 
 Копирует файл из проекта в локальный путь назначения. В локальном режиме источник берётся из текущего Bitrix-проекта; в удалённом — скачивается из зарегистрированного проекта.
 
 ```bash
 php cli.phar file:get local/php_interface/init.php ./init.php
 php cli.phar file:get --remote=prod upload/report.csv ./report.csv
+php cli.phar file:get --remote=prod --compress=zip upload/reports ./reports.zip
 ```
 
-Если `dest` — директория, исходное имя файла сохраняется.
+Если `dest` — директория, исходное имя файла сохраняется. С опцией `--compress=zip` удалённый источник может быть файлом или папкой: перед скачиванием команда создаёт zip-архив средствами PHP-расширения `ZipArchive` в `/bitrix/tmp/bx-cli/compress/<дата>/<уникальный-id>/`, скачивает архив как обычный файл и затем удаляет временный архив на удалённом сервере. Временные директории остаются на сервере для повторного использования.
 
 ## `file:put --remote=<codename> [--local] [--force] [--chunk-size=<byte-count>] <src> <dest>`
 

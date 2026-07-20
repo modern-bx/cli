@@ -7,6 +7,7 @@ namespace ModernBx\Cli\App\Console\Command\Bx\File;
 use ModernBx\Cli\App\Console\Command\BxCommand;
 use ModernBx\Cli\App\Service\Remote\BitrixAdminClient;
 use ModernBx\Cli\App\Service\Remote\RemoteProjectConfigManager;
+use ModernBx\Cli\App\Service\Remote\RemoteFilePhpCodeBuilder;
 use Symfony\Component\Console\Helper\ProgressBar;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
@@ -23,14 +24,18 @@ class GetCommand extends BxCommand
 
     protected BitrixAdminClient $bitrixAdminClient;
 
+    protected RemoteFilePhpCodeBuilder $remoteFilePhpCodeBuilder;
+
     public function __construct(
         RemoteProjectConfigManager $remoteProjectConfigManager,
-        BitrixAdminClient $bitrixAdminClient
+        BitrixAdminClient $bitrixAdminClient,
+        RemoteFilePhpCodeBuilder $remoteFilePhpCodeBuilder
     ) {
         parent::__construct();
 
         $this->remoteProjectConfigManager = $remoteProjectConfigManager;
         $this->bitrixAdminClient = $bitrixAdminClient;
+        $this->remoteFilePhpCodeBuilder = $remoteFilePhpCodeBuilder;
     }
 
     protected function configure(): void
@@ -40,6 +45,12 @@ class GetCommand extends BxCommand
             ->setHelp('Команда копирует файл относительно document root локального или удаленного проекта.')
             ->addOption('remote', null, InputOption::VALUE_REQUIRED, 'Кодовое имя удаленного проекта')
             ->addOption('local', null, InputOption::VALUE_NONE, 'Отключить неявный remote текущей сессии')
+            ->addOption(
+                'compress',
+                null,
+                InputOption::VALUE_REQUIRED,
+                'Сжать файл или папку перед скачиванием (доступно: zip)'
+            )
             ->addArgument('src', InputArgument::REQUIRED, 'Путь к файлу относительно document root проекта')
             ->addArgument('dest', InputArgument::REQUIRED, 'Локальный путь назначения');
     }
@@ -49,6 +60,7 @@ class GetCommand extends BxCommand
         $remote = $input->getOption('remote');
         $srcArgument = $input->getArgument('src');
         $destArgument = $input->getArgument('dest');
+        $compress = $input->getOption('compress');
 
         if (!is_string($srcArgument) || !is_string($destArgument)) {
             throw new \RuntimeException(
@@ -58,16 +70,24 @@ class GetCommand extends BxCommand
         }
 
         $src = $this->normalizeSourcePath($srcArgument);
-        $dest = $this->resolveDestinationPath($destArgument, $src);
+        $compressType = is_string($compress) ? $this->normalizeCompressType($compress) : null;
+        $dest = $this->resolveDestinationPath($destArgument, $this->getDestinationSourceName($src, $compressType));
 
         if (is_string($remote)) {
             $this->printer = $this->getPrinter($output);
             $this->verbose = $input->getOption('verbose') !== false;
-            $this->executeRemote($remote, $src, $dest, $output);
+            $this->executeRemote($remote, $src, $dest, $output, $compressType);
             return;
         }
 
         parent::executeInternal($input, $output);
+        if ($compressType !== null) {
+            throw new \RuntimeException(
+                'Опция --compress поддерживается только для удаленных проектов.',
+                static::CODE_INVALID_ARGUMENT_VALUE,
+            );
+        }
+
         $this->executeLocal($src, $dest);
     }
 
@@ -89,8 +109,13 @@ class GetCommand extends BxCommand
         $this->printer->info(sprintf('Файл сохранен: %s', $dest));
     }
 
-    protected function executeRemote(string $codename, string $src, string $dest, OutputInterface $output): void
-    {
+    protected function executeRemote(
+        string $codename,
+        string $src,
+        string $dest,
+        OutputInterface $output,
+        ?string $compressType = null
+    ): void {
         $config = $this->remoteProjectConfigManager->load($codename);
         $endpoint = $this->remoteProjectConfigManager->getEndpoint($config);
         $sessionId = $this->remoteProjectConfigManager->getSessionId($config);
@@ -117,16 +142,32 @@ class GetCommand extends BxCommand
         $this->ensureDestinationDirectory($dest);
         $this->ensureDestinationDoesNotExist($dest);
 
+        $downloadSrc = $src;
+        if ($compressType !== null) {
+            [$sessionId, $downloadSrc] = $this->compressRemoteSource(
+                $codename,
+                $config,
+                $endpoint,
+                $sessionId,
+                $src,
+                $compressType,
+            );
+        }
+
         try {
-            $this->bitrixAdminClient->downloadFile($endpoint, $sessionId, $src, $dest, $progressFactory);
+            $this->bitrixAdminClient->downloadFile($endpoint, $sessionId, $downloadSrc, $dest, $progressFactory);
         } catch (\RuntimeException $err) {
             if ($err->getMessage() !== 'REMOTE_SESSION_EXPIRED') {
                 throw $err;
             }
 
             $sessionId = $this->remoteProjectConfigManager->refreshSession($codename, $config);
-            $this->bitrixAdminClient->downloadFile($endpoint, $sessionId, $src, $dest, $progressFactory);
+            $this->bitrixAdminClient->downloadFile($endpoint, $sessionId, $downloadSrc, $dest, $progressFactory);
         } finally {
+            if ($compressType !== null) {
+                $this->deleteRemoteTemporaryFile($codename, $config, $endpoint, $sessionId, $downloadSrc);
+            }
+
             if ($progressBar !== null) {
                 $progressBar->finish();
                 $output->writeln('');
@@ -134,6 +175,93 @@ class GetCommand extends BxCommand
         }
 
         $this->printer->info(sprintf('Файл сохранен: %s', $dest));
+    }
+
+
+    protected function normalizeCompressType(string $type): string
+    {
+        $type = strtolower(trim($type));
+
+        if ($type !== 'zip') {
+            throw new \RuntimeException('Поддерживаемый тип сжатия: zip.', static::CODE_INVALID_ARGUMENT_VALUE);
+        }
+
+        return $type;
+    }
+
+    protected function getDestinationSourceName(string $src, ?string $compressType): string
+    {
+        if ($compressType === null) {
+            return $src;
+        }
+
+        return rtrim($src, '/') . '.' . $compressType;
+    }
+
+    /**
+     * @param mixed[] $config
+     * @return array{string, string}
+     */
+    protected function compressRemoteSource(
+        string $codename,
+        array $config,
+        string $endpoint,
+        string $sessionId,
+        string $src,
+        string $compressType
+    ): array {
+        $code = $this->remoteFilePhpCodeBuilder->buildCompress($src, $compressType);
+
+        try {
+            $json = $this->bitrixAdminClient->executePhp($endpoint, $sessionId, $code);
+        } catch (\RuntimeException $err) {
+            if ($err->getMessage() !== 'REMOTE_SESSION_EXPIRED') {
+                throw $err;
+            }
+
+            $sessionId = $this->remoteProjectConfigManager->refreshSession($codename, $config);
+            $json = $this->bitrixAdminClient->executePhp($endpoint, $sessionId, $code);
+        }
+
+        $result = json_decode($json, true);
+        if (!is_array($result) || ($result['ok'] ?? false) !== true || !is_string($result['path'] ?? null)) {
+            $error = is_array($result) && is_string($result['error'] ?? null)
+                ? $result['error']
+                : 'Не удалось сжать файл или папку на удаленном проекте.';
+            throw new \RuntimeException($error);
+        }
+
+        return [$sessionId, $result['path']];
+    }
+
+    /** @param mixed[] $config */
+    protected function deleteRemoteTemporaryFile(
+        string $codename,
+        array $config,
+        string $endpoint,
+        string $sessionId,
+        string $path
+    ): void {
+        $code = $this->remoteFilePhpCodeBuilder->buildDelete($path);
+
+        try {
+            $json = $this->bitrixAdminClient->executePhp($endpoint, $sessionId, $code);
+        } catch (\RuntimeException $err) {
+            if ($err->getMessage() !== 'REMOTE_SESSION_EXPIRED') {
+                throw $err;
+            }
+
+            $sessionId = $this->remoteProjectConfigManager->refreshSession($codename, $config);
+            $json = $this->bitrixAdminClient->executePhp($endpoint, $sessionId, $code);
+        }
+
+        $result = json_decode($json, true);
+        if (!is_array($result) || ($result['ok'] ?? false) !== true) {
+            $error = is_array($result) && is_string($result['error'] ?? null)
+                ? $result['error']
+                : 'Не удалось удалить временный архив на удаленном проекте.';
+            throw new \RuntimeException($error);
+        }
     }
 
     protected function normalizeSourcePath(string $path): string
