@@ -19,7 +19,7 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 
-class UpdateCommand extends KernelCommand
+class AddCommand extends KernelCommand
 {
     use IO;
     use RemotePhpTrait;
@@ -40,50 +40,20 @@ class UpdateCommand extends KernelCommand
         $this->remoteSitePhpCodeBuilder = $remoteSitePhpCodeBuilder;
     }
 
-    /**
-     * @var string
-     */
-    protected static $defaultName = 'site:update';
+    protected static $defaultName = 'site:add';
 
     protected function configure(): void
     {
         $this
-            ->setDescription($this->trans("command.site_update.description"))
-            ->setHelp($this->trans("command.site_update.help"))
-            ->setDefinition(
-                new InputDefinition([
-                    new InputOption(
-                        'remote',
-                        null,
-                        InputOption::VALUE_REQUIRED,
-                        'Кодовое имя удаленного проекта',
-                    ),
-                    new InputOption(
-                        'local',
-                        null,
-                        InputOption::VALUE_NONE,
-                        'Отключить неявный remote текущей сессии',
-                    ),
-                    new InputArgument(
-                        'LID',
-                        InputArgument::REQUIRED,
-                        $this->trans("argument.site.lid"),
-                    ),
-                    new InputArgument(
-                        'fields',
-                        InputArgument::REQUIRED,
-                        $this->trans("argument.site.update_fields"),
-                    ),
-                ]),
-            );
+            ->setDescription($this->trans("command.site_add.description"))
+            ->setHelp($this->trans("command.site_add.help"))
+            ->setDefinition(new InputDefinition([
+                new InputOption('remote', null, InputOption::VALUE_REQUIRED, 'Кодовое имя удаленного проекта'),
+                new InputOption('local', null, InputOption::VALUE_NONE, 'Отключить неявный remote текущей сессии'),
+                new InputArgument('fields', InputArgument::REQUIRED, $this->trans("argument.site.add_fields")),
+            ]));
     }
 
-    /**
-     * @param InputInterface $input
-     * @param OutputInterface $output
-     * @return void
-     * @throws \Exception
-     */
     protected function executeInternal(InputInterface $input, OutputInterface $output): void
     {
         $remote = $input->getOption('remote');
@@ -101,53 +71,48 @@ class UpdateCommand extends KernelCommand
 
     protected function executeLocal(InputInterface $input): void
     {
-        $lid = $input->getArgument("LID");
-        $fields = $input->getArgument("fields");
-
-        if (!is_string($lid)) {
-            throw new \Exception($this->trans("error.site.lid_string"), static::CODE_INVALID_ARGUMENT_VALUE);
-        }
-
-        if (!is_string($fields)) {
-            throw new \Exception($this->trans("error.site.update_json_string"), static::CODE_INVALID_ARGUMENT_VALUE);
-        }
-
-        /** @var array<string, mixed> $decodedFields */
-        $decodedFields = $this->decodeFields($fields);
-        $this->validateFields($decodedFields);
+        $fields = $this->getDecodedFields($input);
 
         /** @noinspection PhpUndefinedClassInspection */
         /** @phpstan-ignore-next-line */
-        $result = \Bitrix\Main\SiteTable::update($lid, $decodedFields);
+        $result = \Bitrix\Main\SiteTable::add($fields);
 
         if (!$result->isSuccess()) {
             throw new \Exception(implode(PHP_EOL, $result->getErrorMessages()), static::CODE_INVALID_ARGUMENT_VALUE);
         }
+
+        $this->printer->info((string) $result->getId());
     }
 
     protected function executeRemote(InputInterface $input, string $remote): void
     {
-        $lid = $input->getArgument("LID");
-        $fields = $input->getArgument("fields");
+        $id = $this->decodeRemoteJsonResult(
+            $this->executeRemotePhp(
+                $remote,
+                $this->remoteSitePhpCodeBuilder->buildAdd($this->getDecodedFields($input)),
+            ),
+            'Не удалось добавить сайт удаленного проекта.',
+        );
 
-        if (!is_string($lid)) {
-            throw new \Exception($this->trans("error.site.lid_string"), static::CODE_INVALID_ARGUMENT_VALUE);
+        if (!is_scalar($id) && $id !== null) {
+            throw new \RuntimeException('Удаленная PHP-консоль вернула некорректный ID сайта.');
         }
+
+        $this->printer->info((string) $id);
+    }
+
+    /** @return array<string, mixed> */
+    private function getDecodedFields(InputInterface $input): array
+    {
+        $fields = $input->getArgument("fields");
 
         if (!is_string($fields)) {
             throw new \Exception($this->trans("error.site.update_json_string"), static::CODE_INVALID_ARGUMENT_VALUE);
         }
 
-        /** @var array<string, mixed> $decodedFields */
         $decodedFields = $this->decodeFields($fields);
         $this->validateFields($decodedFields);
 
-        $this->decodeRemoteJsonResult(
-            $this->executeRemotePhp(
-                $remote,
-                $this->remoteSitePhpCodeBuilder->buildUpdate($lid, $decodedFields),
-            ),
-            'Не удалось обновить сайт удаленного проекта.',
-        );
+        return $decodedFields;
     }
 }

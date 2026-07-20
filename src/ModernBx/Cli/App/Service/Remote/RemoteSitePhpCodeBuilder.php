@@ -29,6 +29,21 @@ final class RemoteSitePhpCodeBuilder
     }
 
     /** @param array<string, mixed> $fields */
+    public function buildAdd(array $fields): string
+    {
+        return $this->build('remote_site_add.php', [
+            '$fields = [];' => '$fields = ' . var_export($fields, true) . ';',
+        ]);
+    }
+
+    public function buildDelete(string $lid): string
+    {
+        return $this->build('remote_site_delete.php', [
+            "\$lid = '__BX_CLI_SITE_LID__';" => '$lid = ' . var_export($lid, true) . ';',
+        ]);
+    }
+
+    /** @param array<string, mixed> $fields */
     public function buildUpdate(string $lid, array $fields): string
     {
         return $this->build('remote_site_update.php', [
