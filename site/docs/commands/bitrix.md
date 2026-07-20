@@ -144,6 +144,24 @@ php cli.phar site:get --select='["LID","NAME","DIR"]' s1
 php cli.phar site:get --remote=prod s1
 ```
 
+## `site:add [--remote=<codename>] [--local] <fields-json>`
+
+Добавляет сайт через D7 `SiteTable::add`. Поля передаются JSON-объектом с той же валидацией допустимых полей, что и в `site:update`. При успехе печатает ID созданной записи.
+
+```bash
+php cli.phar site:add '{"LID":"s2","NAME":"Новый сайт","DIR":"/"}'
+php cli.phar site:add --remote=prod '{"LID":"s2","NAME":"Новый сайт"}'
+```
+
+## `site:delete [--remote=<codename>] [--local] <id>`
+
+Удаляет сайт через D7 `SiteTable::delete`.
+
+```bash
+php cli.phar site:delete s2
+php cli.phar site:delete --remote=prod s2
+```
+
 ## `site:update [--remote=<codename>] [--local] <LID> <fields-json>`
 
 Обновляет поля сайта через `SiteTable::update`. Второй аргумент должен быть JSON-объектом. С `--remote` валидирует JSON локально, а обновление выполняет на зарегистрированном удалённом проекте через D7; `--local` отключает remote текущей сессии.

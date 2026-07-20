@@ -9,7 +9,7 @@
 - `module:install`, `module:uninstall`, `module:reinstall`, `module:version` — управляют жизненным циклом модулей.
 - `option:get`, `option:set` — читают и изменяют опции модулей.
 - `setting:get`, `setting:set` — читают и изменяют `.settings.php` / `.settings_extra.php`.
-- `site:get`, `site:list`, `site:update` — работают с D7 `SiteTable`.
+- `site:add`, `site:delete`, `site:get`, `site:list`, `site:update` — работают с D7 `SiteTable`.
 - `php:exec` — выполняет PHP-код в контексте Bitrix.
 
 ## База данных
