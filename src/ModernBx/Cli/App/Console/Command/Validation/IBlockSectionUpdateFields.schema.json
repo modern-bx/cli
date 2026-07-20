@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Аргумент fields команд iblock.section:add/update",
+  "description": "Допустимые поля JSON-объекта для CIBlockSection::Add/Update. Пользовательские поля UF_* и другие дополнительные поля разрешены.",
+  "$mixin": [
+    "../../Validation/Global.schema.json"
+  ],
+  "type": "object",
+  "$include": { "$ref": "#/$defs/jsonValue" },
+  "properties": {
+    "ACTIVE": { "$ref": "#/$defs/string?" },
+    "CODE": { "$ref": "#/$defs/string?" },
+    "CREATED_BY": { "$ref": "#/$defs/numeric?" },
+    "DATE_CREATE": { "$ref": "#/$defs/string?" },
+    "DESCRIPTION": { "$ref": "#/$defs/string?" },
+    "DESCRIPTION_TYPE": { "$ref": "#/$defs/textType?" },
+    "DETAIL_PICTURE": { "$ref": "#/$defs/fileValue" },
+    "GLOBAL_ACTIVE": { "$ref": "#/$defs/string?" },
+    "IBLOCK_ID": { "$ref": "#/$defs/numeric?" },
+    "IBLOCK_SECTION_ID": { "$ref": "#/$defs/numeric?" },
+    "LEFT_MARGIN": { "$ref": "#/$defs/numeric?" },
+    "MODIFIED_BY": { "$ref": "#/$defs/numeric?" },
+    "NAME": { "$ref": "#/$defs/string?" },
+    "PICTURE": { "$ref": "#/$defs/fileValue" },
+    "RIGHT_MARGIN": { "$ref": "#/$defs/numeric?" },
+    "SEARCHABLE_CONTENT": { "$ref": "#/$defs/string?" },
+    "SOCNET_GROUP_ID": { "$ref": "#/$defs/numeric?" },
+    "SORT": { "$ref": "#/$defs/numeric?" },
+    "TIMESTAMP_X": { "type": ["string", "boolean", "null"] },
+    "TMP_ID": { "$ref": "#/$defs/string?" },
+    "XML_ID": { "$ref": "#/$defs/string?" },
+    "EXTERNAL_ID": { "$ref": "#/$defs/string?" }
+  },
+  "$defs": {
+    "textType?": { "type": ["string", "null"], "enum": ["text", "html", null] },
+    "fileValue": { "$ref": "#/$defs/jsonValue" }
+  }
+}

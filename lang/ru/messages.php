@@ -131,6 +131,35 @@ return [
         'некорректный JSON: %message%',
     'error.iblock_element.update_failed' => 'Не удалось обновить элемент инфоблока.',
 
+    'command.iblock_section_add.description' => 'Добавить раздел инфоблока Bitrix',
+    'command.iblock_section_add.help' => 'Добавляет раздел инфоблока через CIBlockSection::Add и печатает ID.',
+    'command.iblock_section_delete.description' => 'Удалить раздел инфоблока Bitrix',
+    'command.iblock_section_delete.help' => 'Удаляет раздел инфоблока через CIBlockSection::Delete.',
+    'command.iblock_section_get.description' => 'Получить поля раздела инфоблока Bitrix',
+    'command.iblock_section_get.help' => 'Печатает поля раздела инфоблока как JSON через ' .
+        'CIBlockSection::GetList с выборкой UF_*.',
+    'command.iblock_section_update.description' => 'Обновить поля раздела инфоблока Bitrix',
+    'command.iblock_section_update.help' => 'Обновляет поля раздела инфоблока через старый API CIBlockSection::Update.',
+    'argument.iblock_section.id' => 'ID раздела инфоблока',
+    'argument.iblock_section.add_fields' => 'JSON-объект с полями для CIBlockSection::Add; ' .
+        'если не указан, читается stdin',
+    'argument.iblock_section.update_fields' => 'JSON-объект с полями для CIBlockSection::Update; ' .
+        'если не указан, читается stdin',
+    'error.iblock_section.id_positive' => 'ID раздела инфоблока должен быть положительным целым числом.',
+    'error.iblock_section.not_found' => 'Раздел инфоблока с ID %id% не найден.',
+    'error.iblock_section.add_failed' => 'Не удалось добавить раздел инфоблока.',
+    'error.iblock_section.delete_failed' => 'Не удалось удалить раздел инфоблока.',
+    'error.iblock_section.fields_required' => 'JSON с полями раздела инфоблока должен быть передан ' .
+        'аргументом или через stdin.',
+    'error.iblock_section.update_json_string' => 'Поля раздела инфоблока должны быть JSON-строкой объекта.',
+    'error.iblock_section.update_invalid_json' => 'Поля раздела инфоблока содержат некорректный JSON: %message%',
+    'error.iblock_section.update_object' => 'Поля раздела инфоблока должны быть JSON-объектом.',
+    'error.iblock_section.update_schema' => 'Поля раздела инфоблока не соответствуют схеме: %message%',
+    'error.iblock_section.update_schema_read' => 'Не удалось прочитать схему полей раздела инфоблока: %file%',
+    'error.iblock_section.update_schema_invalid' => 'Схема полей раздела инфоблока содержит ' .
+        'некорректный JSON: %message%',
+    'error.iblock_section.update_failed' => 'Не удалось обновить раздел инфоблока.',
+
     'error.validation.mixin_array' => 'Ключ $mixin в JSON Schema должен быть массивом строк.',
     'error.validation.mixin_string' => 'Ключ $mixin в JSON Schema должен содержать только строки.',
     'error.validation.mixin_circular' => 'Обнаружено циклическое подключение JSON Schema: %file%',
