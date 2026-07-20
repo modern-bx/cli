@@ -12,16 +12,30 @@ php cli.phar file:list --short 'upload/*.jpg'
 php cli.phar file:list --remote=prod bitrix/admin
 ```
 
-## `file:get [--remote=<codename>] [--local] <src> <dest>`
+## `file:get [--remote=<codename>] [--local] [--compress=zip] <src> <dest>`
 
 Копирует файл из проекта в локальный путь назначения. В локальном режиме источник берётся из текущего Bitrix-проекта; в удалённом — скачивается из зарегистрированного проекта.
 
 ```bash
 php cli.phar file:get local/php_interface/init.php ./init.php
 php cli.phar file:get --remote=prod upload/report.csv ./report.csv
+php cli.phar file:get --remote=prod --compress=zip upload/reports ./reports.zip
 ```
 
-Если `dest` — директория, исходное имя файла сохраняется.
+Если `dest` — директория, исходное имя файла сохраняется. С опцией `--compress=zip` удалённый источник может быть файлом или папкой: перед скачиванием команда создаёт zip-архив средствами PHP-расширения `ZipArchive` в `/bitrix/tmp/bx-cli/compress/<дата>/<уникальный-id>/`, скачивает архив как обычный файл и затем удаляет временный архив на удалённом сервере. Временные директории остаются на сервере для повторного использования.
+
+
+## `file:extract [--remote=<codename>] [--local] [--format=zip] [--force] <src> <dest>`
+
+Распаковывает архив из файловой структуры проекта в папку назначения относительно document root. Если `--format` не указан, команда пытается определить формат по расширению архива; сейчас поддерживается только `zip` через PHP-расширение `ZipArchive`. Папка назначения и промежуточные директории создаются автоматически, а уже существующая папка не считается ошибкой.
+
+Если при распаковке в папке назначения уже есть файл с тем же именем, без `--force` команда завершится ошибкой. С `--force` файл будет перезаписан, а предупреждение выводится только в verbose-режиме.
+
+```bash
+php cli.phar file:extract upload/reports.zip upload/reports
+php cli.phar file:extract --remote=prod --format=zip --force upload/reports.zip upload/reports
+php cli.phar -vvv file:extract --remote=prod --force upload/reports.zip upload/reports
+```
 
 ## `file:put --remote=<codename> [--local] [--force] [--chunk-size=<byte-count>] <src> <dest>`
 
