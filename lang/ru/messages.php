@@ -100,12 +100,15 @@ return [
     'error.site.update_schema' => 'Поля обновления не соответствуют схеме: %message%',
     'error.site.update_schema_read' => 'Не удалось прочитать схему полей обновления: %file%',
     'error.site.update_schema_invalid' => 'Схема полей обновления содержит некорректный JSON: %message%',
+    'command.iblock_element_get.description' => 'Получить поля элемента инфоблока Bitrix',
+    'command.iblock_element_get.help' => 'Печатает поля элемента инфоблока как JSON через CIBlockElement::GetList.',
     'command.iblock_element_update.description' => 'Обновить поля элемента инфоблока Bitrix',
     'command.iblock_element_update.help' => 'Обновляет поля элемента инфоблока через старый API ' .
         'CIBlockElement::Update без PROPERTY_VALUES.',
     'argument.iblock_element.id' => 'ID элемента инфоблока',
     'argument.iblock_element.update_fields' => 'JSON-объект с полями для CIBlockElement::Update без PROPERTY_VALUES',
     'error.iblock_element.id_positive' => 'ID элемента инфоблока должен быть положительным целым числом.',
+    'error.iblock_element.not_found' => 'Элемент инфоблока с ID %id% не найден.',
     'error.iblock_element.update_json_string' => 'Поля обновления элемента инфоблока должны быть JSON-строкой объекта.',
     'error.iblock_element.update_invalid_json' => 'Поля обновления элемента инфоблока содержат некорректный JSON: ' .
         '%message%',

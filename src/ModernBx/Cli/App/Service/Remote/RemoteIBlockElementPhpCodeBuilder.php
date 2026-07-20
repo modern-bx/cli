@@ -10,6 +10,14 @@ final class RemoteIBlockElementPhpCodeBuilder
 
     private const SNIPPET_DIR = __DIR__ . '/../../Resources/Snippets';
 
+    public function buildGet(int $id, int $flags): string
+    {
+        return $this->build('remote_iblock_element_get.php', [
+            '$id = 0;' => '$id = ' . $id . ';',
+            '$jsonFlags = JSON_UNESCAPED_UNICODE;' => '$jsonFlags = ' . $flags . ';',
+        ]);
+    }
+
     /** @param array<string, mixed> $fields */
     public function buildUpdate(int $id, array $fields): string
     {
