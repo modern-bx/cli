@@ -23,6 +23,16 @@ final class RemoteFilePhpCodeBuilder
         ]);
     }
 
+    public function buildExtract(string $source, string $destination, string $format, bool $force): string
+    {
+        return strtr($this->build('remote_file_extract.php'), [
+            "'__REMOTE_FILE_EXTRACT_SOURCE__'" => var_export(json_encode($source), true),
+            "'__REMOTE_FILE_EXTRACT_DESTINATION__'" => var_export(json_encode($destination), true),
+            "'__REMOTE_FILE_EXTRACT_FORMAT__'" => var_export(json_encode($format), true),
+            "'__REMOTE_FILE_EXTRACT_FORCE__'" => var_export(json_encode($force), true),
+        ]);
+    }
+
     public function buildDelete(string $path): string
     {
         return strtr($this->build('remote_file_delete.php'), [
