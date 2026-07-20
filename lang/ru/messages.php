@@ -100,6 +100,36 @@ return [
     'error.site.update_schema' => 'Поля обновления не соответствуют схеме: %message%',
     'error.site.update_schema_read' => 'Не удалось прочитать схему полей обновления: %file%',
     'error.site.update_schema_invalid' => 'Схема полей обновления содержит некорректный JSON: %message%',
+    'command.iblock_element_add.description' => 'Добавить элемент инфоблока Bitrix',
+    'command.iblock_element_add.help' => 'Добавляет элемент инфоблока через CIBlockElement::Add и печатает ID.',
+    'command.iblock_element_delete.description' => 'Удалить элемент инфоблока Bitrix',
+    'command.iblock_element_delete.help' => 'Удаляет элемент инфоблока через CIBlockElement::Delete.',
+    'command.iblock_element_get.description' => 'Получить поля элемента инфоблока Bitrix',
+    'command.iblock_element_get.help' => 'Печатает поля элемента инфоблока как JSON через CIBlockElement::GetList.',
+    'command.iblock_element_update.description' => 'Обновить поля элемента инфоблока Bitrix',
+    'command.iblock_element_update.help' => 'Обновляет поля элемента инфоблока через старый API ' .
+        'CIBlockElement::Update без PROPERTY_VALUES.',
+    'argument.iblock_element.id' => 'ID элемента инфоблока',
+    'argument.iblock_element.add_fields' => 'JSON-объект с полями для CIBlockElement::Add ' .
+        'без PROPERTY_VALUES; если не указан, читается stdin',
+    'argument.iblock_element.update_fields' => 'JSON-объект с полями для CIBlockElement::Update ' .
+        'без PROPERTY_VALUES; если не указан, читается stdin',
+    'error.iblock_element.id_positive' => 'ID элемента инфоблока должен быть положительным целым числом.',
+    'error.iblock_element.not_found' => 'Элемент инфоблока с ID %id% не найден.',
+    'error.iblock_element.add_failed' => 'Не удалось добавить элемент инфоблока.',
+    'error.iblock_element.delete_failed' => 'Не удалось удалить элемент инфоблока.',
+    'error.iblock_element.fields_required' => 'JSON с полями элемента инфоблока должен быть передан ' .
+        'аргументом или через stdin.',
+    'error.iblock_element.update_json_string' => 'Поля обновления элемента инфоблока должны быть JSON-строкой объекта.',
+    'error.iblock_element.update_invalid_json' => 'Поля обновления элемента инфоблока содержат некорректный JSON: ' .
+        '%message%',
+    'error.iblock_element.update_object' => 'Поля обновления элемента инфоблока должны быть JSON-объектом.',
+    'error.iblock_element.update_schema' => 'Поля обновления элемента инфоблока не соответствуют схеме: %message%',
+    'error.iblock_element.update_schema_read' => 'Не удалось прочитать схему полей обновления элемента инфоблока: ' .
+        '%file%',
+    'error.iblock_element.update_schema_invalid' => 'Схема полей обновления элемента инфоблока содержит ' .
+        'некорректный JSON: %message%',
+    'error.iblock_element.update_failed' => 'Не удалось обновить элемент инфоблока.',
 
     'error.validation.mixin_array' => 'Ключ $mixin в JSON Schema должен быть массивом строк.',
     'error.validation.mixin_string' => 'Ключ $mixin в JSON Schema должен содержать только строки.',

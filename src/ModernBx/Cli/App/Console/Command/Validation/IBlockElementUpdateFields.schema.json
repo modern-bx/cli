@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Аргумент fields команды iblock.element:update",
+  "description": "Допустимые поля JSON-объекта для CIBlockElement::Update без PROPERTY_VALUES.",
+  "$mixin": [
+    "../../Validation/Global.schema.json"
+  ],
+  "type": "object",
+  "$include": false,
+  "properties": {
+    "ACTIVE": { "$ref": "#/$defs/string?" },
+    "ACTIVE_FROM": { "$ref": "#/$defs/string?" },
+    "ACTIVE_TO": { "$ref": "#/$defs/string?" },
+    "CODE": { "$ref": "#/$defs/string?" },
+    "CREATED_BY": { "$ref": "#/$defs/numeric?" },
+    "DATE_CREATE": { "$ref": "#/$defs/string?" },
+    "DETAIL_PICTURE": { "$ref": "#/$defs/fileValue" },
+    "DETAIL_TEXT": { "$ref": "#/$defs/string?" },
+    "DETAIL_TEXT_TYPE": { "$ref": "#/$defs/textType?" },
+    "IBLOCK_ID": { "$ref": "#/$defs/numeric?" },
+    "IBLOCK_SECTION": {
+      "type": ["array", "null"],
+      "items": { "$ref": "#/$defs/numeric" }
+    },
+    "IBLOCK_SECTION_ID": { "$ref": "#/$defs/numeric?" },
+    "IN_SECTIONS": { "$ref": "#/$defs/string?" },
+    "MODIFIED_BY": { "$ref": "#/$defs/numeric?" },
+    "NAME": { "$ref": "#/$defs/string?" },
+    "PREVIEW_PICTURE": { "$ref": "#/$defs/fileValue" },
+    "PREVIEW_TEXT": { "$ref": "#/$defs/string?" },
+    "PREVIEW_TEXT_TYPE": { "$ref": "#/$defs/textType?" },
+    "SEARCHABLE_CONTENT": { "$ref": "#/$defs/string?" },
+    "SHOW_COUNTER": { "$ref": "#/$defs/numeric?" },
+    "SHOW_COUNTER_START": { "$ref": "#/$defs/string?" },
+    "SORT": { "$ref": "#/$defs/numeric?" },
+    "TAGS": { "$ref": "#/$defs/string?" },
+    "TIMESTAMP_X": { "type": ["string", "boolean", "null"] },
+    "TMP_ID": { "$ref": "#/$defs/string?" },
+    "WF_COMMENTS": { "$ref": "#/$defs/string?" },
+    "WF_DATE_LOCK": { "$ref": "#/$defs/string?" },
+    "WF_LOCKED_BY": { "$ref": "#/$defs/numeric?" },
+    "WF_NEW": { "$ref": "#/$defs/string?" },
+    "WF_PARENT_ELEMENT_ID": { "$ref": "#/$defs/numeric?" },
+    "WF_STATUS_ID": { "$ref": "#/$defs/numeric?" },
+    "XML_ID": { "$ref": "#/$defs/string?" },
+    "EXTERNAL_ID": { "$ref": "#/$defs/string?" }
+  },
+  "$defs": {
+    "textType?": { "type": ["string", "null"], "enum": ["text", "html", null] },
+    "fileValue": { "$ref": "#/$defs/jsonValue" }
+  }
+}

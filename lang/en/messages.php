@@ -98,6 +98,34 @@ return [
     'error.site.update_schema' => 'Update fields do not match the schema: %message%',
     'error.site.update_schema_read' => 'Unable to read update fields schema: %file%',
     'error.site.update_schema_invalid' => 'Update fields schema contains invalid JSON: %message%',
+    'command.iblock_element_add.description' => 'Add Bitrix iblock element',
+    'command.iblock_element_add.help' => 'Add Bitrix iblock element using CIBlockElement::Add and print ID.',
+    'command.iblock_element_delete.description' => 'Delete Bitrix iblock element',
+    'command.iblock_element_delete.help' => 'Delete Bitrix iblock element using CIBlockElement::Delete.',
+    'command.iblock_element_get.description' => 'Get Bitrix iblock element fields',
+    'command.iblock_element_get.help' => 'Print iblock element fields as JSON using CIBlockElement::GetList.',
+    'command.iblock_element_update.description' => 'Update Bitrix iblock element fields',
+    'command.iblock_element_update.help' => 'Update Bitrix iblock element fields using legacy ' .
+        'CIBlockElement::Update API without PROPERTY_VALUES.',
+    'argument.iblock_element.id' => 'Iblock element ID',
+    'argument.iblock_element.add_fields' => 'JSON object with CIBlockElement::Add fields without PROPERTY_VALUES; ' .
+        'read from stdin when omitted',
+    'argument.iblock_element.update_fields' => 'JSON object with CIBlockElement::Update fields ' .
+        'without PROPERTY_VALUES; read from stdin when omitted',
+    'error.iblock_element.id_positive' => 'Iblock element ID must be a positive integer.',
+    'error.iblock_element.not_found' => 'Iblock element with ID %id% was not found.',
+    'error.iblock_element.add_failed' => 'Failed to add iblock element.',
+    'error.iblock_element.delete_failed' => 'Failed to delete iblock element.',
+    'error.iblock_element.fields_required' => 'Iblock element fields JSON must be passed as an argument ' .
+        'or through stdin.',
+    'error.iblock_element.update_json_string' => 'Iblock element update fields must be a JSON object string.',
+    'error.iblock_element.update_invalid_json' => 'Iblock element update fields contain invalid JSON: %message%',
+    'error.iblock_element.update_object' => 'Iblock element update fields must be a JSON object.',
+    'error.iblock_element.update_schema' => 'Iblock element update fields do not match schema: %message%',
+    'error.iblock_element.update_schema_read' => 'Failed to read iblock element update fields schema: %file%',
+    'error.iblock_element.update_schema_invalid' => 'Iblock element update fields schema contains invalid JSON: ' .
+        '%message%',
+    'error.iblock_element.update_failed' => 'Failed to update iblock element.',
 
     'error.validation.mixin_array' => 'JSON Schema $mixin must be an array of strings.',
     'error.validation.mixin_string' => 'JSON Schema $mixin must contain only strings.',
