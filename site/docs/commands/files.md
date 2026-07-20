@@ -63,6 +63,17 @@ php cli.phar file:apply --remote=prod --force --yes ./dist local/templates/site/
 php cli.phar file:apply --remote=prod --chunk-size=5242880 ./dist local/templates/site/assets
 ```
 
+
+## `file:save [--remote=<codename>] [--local] [--short] <file>`
+
+Создаёт запись в таблице `b_file` для уже существующего файла через `CFile::MakeFileArray()` и `CFile::SaveFile()`. Путь задаётся относительно document root локального или удалённого проекта. По умолчанию команда выводит JSON-объект со всеми полями созданной строки `b_file`, а с опцией `--short` — только ID.
+
+```bash
+php cli.phar file:save upload/logo.png
+php cli.phar file:save --short upload/logo.png
+php cli.phar file:save --remote=prod upload/logo.png
+```
+
 ## `file:mkdir [--remote=<codename>] [--local] <directory-path>`
 
 Создает директорию по пути относительно document root локального или удалённого проекта. Промежуточные директории в локальном режиме создаются автоматически.
