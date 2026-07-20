@@ -18,6 +18,21 @@ final class RemoteIBlockElementPhpCodeBuilder
     }
 
     /** @param array<string, mixed> $fields */
+    public function buildAdd(array $fields): string
+    {
+        return $this->build('remote_iblock_element_add.php', [
+            '$fields = [];' => '$fields = ' . var_export($fields, true) . ';',
+        ]);
+    }
+
+    public function buildDelete(int $id): string
+    {
+        return $this->build('remote_iblock_element_delete.php', [
+            '$id = 0;' => '$id = ' . $id . ';',
+        ]);
+    }
+
+    /** @param array<string, mixed> $fields */
     public function buildUpdate(int $id, array $fields): string
     {
         return $this->build('remote_iblock_element_update.php', [
