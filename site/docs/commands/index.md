@@ -10,6 +10,7 @@
 - `option:get`, `option:set` — читают и изменяют опции модулей.
 - `setting:get`, `setting:set` — читают и изменяют `.settings.php` / `.settings_extra.php`.
 - `site:add`, `site:delete`, `site:get`, `site:list`, `site:update` — работают с D7 `SiteTable`.
+- `iblock:*`, `iblock.section:*`, `iblock.type:*` — управляют инфоблоками, разделами и типами инфоблоков через старый Bitrix API.
 - `php:exec` — выполняет PHP-код в контексте Bitrix.
 
 ## База данных
