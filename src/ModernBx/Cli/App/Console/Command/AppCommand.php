@@ -126,7 +126,7 @@ class AppCommand extends GenericCommand
     {
         $sessionRemote = $this->getSessionRemote();
 
-        if ($sessionRemote === null || $this->getName() === 'session:remote') {
+        if ($sessionRemote === null || $this->shouldIgnoreSessionRemote()) {
             return false;
         }
 
@@ -157,6 +157,13 @@ class AppCommand extends GenericCommand
         ));
 
         return false;
+    }
+
+    protected function shouldIgnoreSessionRemote(): bool
+    {
+        $name = $this->getName();
+
+        return $name === 'session:remote' || (is_string($name) && str_starts_with($name, 'remote:'));
     }
 
     protected function getSessionRemote(): ?string
