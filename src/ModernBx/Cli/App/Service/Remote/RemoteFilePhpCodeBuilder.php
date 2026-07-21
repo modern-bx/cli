@@ -47,6 +47,13 @@ final class RemoteFilePhpCodeBuilder
         ]);
     }
 
+    public function buildCFileGet(int $id): string
+    {
+        return strtr($this->build('remote_cfile_get.php'), [
+            '$id = random_int(1, PHP_INT_MAX);' => '$id = ' . $id . ';',
+        ]);
+    }
+
     public function buildCFileDelete(int $id, bool $force): string
     {
         return strtr($this->build('remote_cfile_delete.php'), [

@@ -23,6 +23,7 @@
 ## CFile
 
 - `cfile:save` — создаёт запись в `b_file` для существующего файла.
+- `cfile:get` — возвращает JSON с результатом `CFile::GetFileArray()`.
 - `cfile:delete` — удаляет файл из `b_file` через `CFile::Delete()`.
 
 ## Файлы
