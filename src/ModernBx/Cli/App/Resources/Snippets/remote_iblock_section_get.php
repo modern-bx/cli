@@ -16,7 +16,25 @@ try {
         throw new \RuntimeException('ID раздела инфоблока должен быть положительным целым числом.');
     }
 
-    $result = \CIBlockSection::GetList([], ['ID' => $id], false, ['*', 'UF_*'], ['nTopCount' => 1]);
+    $minimalResult = \CIBlockSection::GetList([], ['ID' => $id], false, ['ID', 'IBLOCK_ID'], ['nTopCount' => 1]);
+    $minimalSection = $minimalResult->GetNext();
+
+    if (!$minimalSection) {
+        throw new \RuntimeException('Раздел инфоблока с ID ' . $id . ' не найден.');
+    }
+
+    $iblockId = $minimalSection['IBLOCK_ID'] ?? null;
+    if ((!is_int($iblockId) && !is_string($iblockId)) || !ctype_digit((string) $iblockId) || (int) $iblockId <= 0) {
+        throw new \RuntimeException('Не удалось определить IBLOCK_ID раздела инфоблока.');
+    }
+
+    $result = \CIBlockSection::GetList(
+        [],
+        ['ID' => $id, 'IBLOCK_ID' => (int) $iblockId],
+        false,
+        ['*', 'UF_*'],
+        ['nTopCount' => 1]
+    );
     $section = $result->GetNext();
 
     if (!$section) {

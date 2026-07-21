@@ -82,7 +82,14 @@ class GetCommand extends KernelCommand
             throw new \RuntimeException('Класс CIBlockSection недоступен.');
         }
 
-        $result = \CIBlockSection::GetList([], ['ID' => $id], false, ['*', 'UF_*'], ['nTopCount' => 1]);
+        $iblockId = $this->getSectionIBlockId($id);
+        $result = \CIBlockSection::GetList(
+            [],
+            ['ID' => $id, 'IBLOCK_ID' => $iblockId],
+            false,
+            ['*', 'UF_*'],
+            ['nTopCount' => 1]
+        );
         $section = $result->GetNext();
 
         if (!$section) {
@@ -111,6 +118,28 @@ class GetCommand extends KernelCommand
 
         /** @var array<string, mixed> $fields */
         $this->printer->info((string) to_json($fields, $flags));
+    }
+
+
+    private function getSectionIBlockId(int $id): int
+    {
+        /** @phpstan-ignore-next-line */
+        $result = \CIBlockSection::GetList([], ['ID' => $id], false, ['ID', 'IBLOCK_ID'], ['nTopCount' => 1]);
+        $section = $result->GetNext();
+
+        if (!$section) {
+            throw new \Exception(
+                $this->trans('error.iblock_section.not_found', ['%id%' => (string) $id]),
+                static::CODE_INVALID_ARGUMENT_VALUE
+            );
+        }
+
+        $iblockId = $section['IBLOCK_ID'] ?? null;
+        if ((!is_int($iblockId) && !is_string($iblockId)) || !ctype_digit((string) $iblockId) || (int) $iblockId <= 0) {
+            throw new \RuntimeException('Не удалось определить IBLOCK_ID раздела инфоблока.');
+        }
+
+        return (int) $iblockId;
     }
 
     private function getSectionId(InputInterface $input): int
