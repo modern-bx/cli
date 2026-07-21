@@ -6,6 +6,7 @@ namespace ModernBx\Cli\App\Console\Command\Bx\Backup;
 
 use ModernBx\Cli\App\Console\Command\BxCommand;
 use ModernBx\Cli\App\Service\Remote\BitrixAdminClient;
+use ModernBx\Cli\App\Service\Remote\RemoteBackupPhpCodeBuilder;
 use ModernBx\Cli\App\Service\Remote\RemotePhpTrait;
 use ModernBx\Cli\App\Service\Remote\RemoteProjectConfigManager;
 use Symfony\Component\Console\Input\InputArgument;
@@ -20,14 +21,18 @@ final class GetCommand extends BxCommand
     /** @var string */
     protected static $defaultName = 'backup:get';
 
+    protected RemoteBackupPhpCodeBuilder $remoteBackupPhpCodeBuilder;
+
     public function __construct(
         RemoteProjectConfigManager $remoteProjectConfigManager,
-        BitrixAdminClient $bitrixAdminClient
+        BitrixAdminClient $bitrixAdminClient,
+        RemoteBackupPhpCodeBuilder $remoteBackupPhpCodeBuilder
     ) {
         parent::__construct();
 
         $this->remoteProjectConfigManager = $remoteProjectConfigManager;
         $this->bitrixAdminClient = $bitrixAdminClient;
+        $this->remoteBackupPhpCodeBuilder = $remoteBackupPhpCodeBuilder;
     }
 
     protected function configure(): void
@@ -133,7 +138,7 @@ final class GetCommand extends BxCommand
     protected function fetchRemoteVolumePaths(string $codename, string $backupName): array
     {
         $result = $this->decodeRemoteJsonResult(
-            $this->executeRemotePhp($codename, $this->buildRemoteVolumeListCode($backupName)),
+            $this->executeRemotePhp($codename, $this->remoteBackupPhpCodeBuilder->buildGetVolumes($backupName)),
             'Не удалось получить список томов резервной копии удаленного проекта.',
         );
 
@@ -142,52 +147,6 @@ final class GetCommand extends BxCommand
         }
 
         return array_values(array_filter($result, 'is_string'));
-    }
-
-    protected function buildRemoteVolumeListCode(string $backupName): string
-    {
-        return strtr(<<<'PHP'
-$backupName = '__BACKUP_NAME__';
-$send = static function (array $payload): void {
-    echo json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?: '{"ok":false}';
-};
-
-try {
-    $documentRoot = rtrim((string) ($_SERVER['DOCUMENT_ROOT'] ?? ''), '/');
-
-    if ($documentRoot === '') {
-        throw new \RuntimeException('DOCUMENT_ROOT не определен.');
-    }
-
-    $backupDirectory = $documentRoot . '/bitrix/backup';
-    $mainPath = $backupDirectory . '/' . $backupName;
-
-    if (!is_file($mainPath)) {
-        throw new \RuntimeException('Основной файл резервной копии не найден: ' . $backupName);
-    }
-
-    $paths = ['/bitrix/backup/' . $backupName];
-    $volumePaths = glob($mainPath . '.*') ?: [];
-    $volumes = [];
-
-    foreach ($volumePaths as $path) {
-        $suffix = substr($path, strlen($mainPath) + 1);
-
-        if (!ctype_digit($suffix) || (int) $suffix <= 0 || !is_file($path)) {
-            continue;
-        }
-
-        $volumes[(int) $suffix] = '/bitrix/backup/' . basename($path);
-    }
-
-    ksort($volumes, SORT_NUMERIC);
-    $send(['ok' => true, 'result' => array_merge($paths, array_values($volumes))]);
-} catch (\Throwable $err) {
-    $send(['ok' => false, 'error' => $err->getMessage()]);
-}
-PHP, [
-            '__BACKUP_NAME__' => addslashes($backupName),
-        ]);
     }
 
     protected function executeLocal(string $backupName, string $destinationDirectory, bool $force): void

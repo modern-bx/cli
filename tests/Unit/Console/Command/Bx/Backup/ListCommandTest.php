@@ -6,6 +6,7 @@ namespace ModernBx\Cli\Tests\Unit\Console\Command\Bx\Backup;
 
 use ModernBx\Cli\App\Console\Command\Bx\Backup\ListCommand;
 use ModernBx\Cli\App\Service\Remote\BitrixAdminClient;
+use ModernBx\Cli\App\Service\Remote\RemoteBackupPhpCodeBuilder;
 use ModernBx\Cli\App\Service\Remote\RemoteProjectConfigManager;
 use ModernBx\Url\UrlImmutable;
 use PHPUnit\Framework\TestCase;
@@ -129,7 +130,7 @@ final class ListCommandTest extends TestCase
         $reflection = new \ReflectionClass(BitrixAdminClient::class);
         $bitrixAdminClient = $reflection->newInstanceWithoutConstructor();
 
-        return new ListCommand($configManager, $bitrixAdminClient);
+        return new ListCommand($configManager, $bitrixAdminClient, new RemoteBackupPhpCodeBuilder());
     }
 
     private function createDocumentRoot(): string
