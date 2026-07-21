@@ -171,6 +171,118 @@ php cli.phar site:update s1 '{"NAME":"Основной сайт"}'
 php cli.phar site:update --remote=prod s1 '{"NAME":"Основной сайт"}'
 ```
 
+## `iblock:add [--remote=<codename>] [--local] <fields-json>`
+
+Добавляет инфоблок через `CIBlock::Add` и печатает ID созданного инфоблока. Поля передаются JSON-объектом; если аргумент не указан, JSON читается из stdin. Для удалённого проекта используйте `--remote`, а `--local` отключает неявный remote текущей сессии.
+
+```bash
+php cli.phar iblock:add '{"IBLOCK_TYPE_ID":"content","LID":"s1","NAME":"Новости","CODE":"news","ACTIVE":"Y"}'
+echo '{"IBLOCK_TYPE_ID":"content","LID":["s1"],"NAME":"Каталог"}' | php cli.phar iblock:add
+php cli.phar iblock:add --remote=prod '{"IBLOCK_TYPE_ID":"content","LID":"s1","NAME":"Новости"}'
+```
+
+## `iblock:get [--remote=<codename>] [--local] [--pretty] <ID>`
+
+Печатает поля инфоблока как JSON через `CIBlock::GetList`. С `--pretty` форматирует JSON.
+
+```bash
+php cli.phar iblock:get 5
+php cli.phar iblock:get --pretty 5
+php cli.phar iblock:get --remote=prod 5
+```
+
+## `iblock:update [--remote=<codename>] [--local] <ID> <fields-json>`
+
+Обновляет поля инфоблока через `CIBlock::Update`. Второй аргумент должен быть JSON-объектом и валидируется той же схемой допустимых полей, что и `iblock:add`.
+
+```bash
+php cli.phar iblock:update 5 '{"NAME":"Новые новости","ACTIVE":"Y"}'
+php cli.phar iblock:update --remote=prod 5 '{"SORT":200}'
+```
+
+## `iblock:delete [--remote=<codename>] [--local] <ID>`
+
+Удаляет инфоблок через `CIBlock::Delete`.
+
+```bash
+php cli.phar iblock:delete 5
+php cli.phar iblock:delete --remote=prod 5
+```
+
+## `iblock.section:add [--remote=<codename>] [--local] <fields-json>`
+
+Добавляет раздел инфоблока через `CIBlockSection::Add` и печатает ID. Поля передаются JSON-объектом или читаются из stdin. Схема валидации разрешает дополнительные поля, поэтому в payload можно передавать пользовательские поля `UF_*`.
+
+```bash
+php cli.phar iblock.section:add '{"IBLOCK_ID":5,"NAME":"Акции","CODE":"sale","UF_BADGE":"hot"}'
+php cli.phar iblock.section:add --remote=prod '{"IBLOCK_ID":5,"NAME":"Акции"}'
+```
+
+## `iblock.section:get [--remote=<codename>] [--local] [--pretty] <ID>`
+
+Печатает поля раздела как JSON. Команда сначала определяет `IBLOCK_ID` раздела, затем делает основную выборку `CIBlockSection::GetList` с `['*', 'UF_*']`, чтобы в ответ попали пользовательские поля. Тильда-ключи Bitrix (`~FIELD`) нормализуются в обычные имена полей.
+
+```bash
+php cli.phar iblock.section:get 10
+php cli.phar iblock.section:get --pretty 10
+php cli.phar iblock.section:get --remote=prod 10
+```
+
+## `iblock.section:update [--remote=<codename>] [--local] <ID> <fields-json>`
+
+Обновляет раздел через `CIBlockSection::Update`. JSON-поля валидируются, дополнительные поля разрешены — это позволяет передавать пользовательские `UF_*` поля.
+
+```bash
+php cli.phar iblock.section:update 10 '{"NAME":"Скидки","UF_BADGE":"sale"}'
+php cli.phar iblock.section:update --remote=prod 10 '{"SORT":100}'
+```
+
+## `iblock.section:delete [--remote=<codename>] [--local] <ID>`
+
+Удаляет раздел через `CIBlockSection::Delete`.
+
+```bash
+php cli.phar iblock.section:delete 10
+php cli.phar iblock.section:delete --remote=prod 10
+```
+
+## `iblock.type:add [--remote=<codename>] [--local] <fields-json>`
+
+Добавляет тип инфоблока через `CIBlockType::Add` и печатает его строковый ID из поля `ID`. В payload обычно передают `ID`, `SECTIONS`, `IN_RSS`, `SORT` и `LANG`.
+
+```bash
+php cli.phar iblock.type:add '{"ID":"content","SECTIONS":"Y","IN_RSS":"N","SORT":100,"LANG":{"ru":{"NAME":"Контент","SECTION_NAME":"Разделы","ELEMENT_NAME":"Элементы"}}}'
+php cli.phar iblock.type:add --remote=prod '{"ID":"content","SECTIONS":"Y","LANG":{"ru":{"NAME":"Контент"}}}'
+```
+
+## `iblock.type:get [--remote=<codename>] [--local] [--pretty] <ID>`
+
+Печатает поля типа инфоблока как JSON через `CIBlockType::GetList`. ID типа — строка, например `content` или `catalog`.
+
+```bash
+php cli.phar iblock.type:get content
+php cli.phar iblock.type:get --pretty content
+php cli.phar iblock.type:get --remote=prod content
+```
+
+## `iblock.type:update [--remote=<codename>] [--local] <ID> <fields-json>`
+
+Обновляет тип инфоблока через `CIBlockType::Update`.
+
+```bash
+php cli.phar iblock.type:update content '{"SORT":200,"LANG":{"ru":{"NAME":"Материалы"}}}'
+php cli.phar iblock.type:update --remote=prod content '{"IN_RSS":"N"}'
+```
+
+## `iblock.type:delete [--remote=<codename>] [--local] <ID>`
+
+Удаляет тип инфоблока через `CIBlockType::Delete`.
+
+```bash
+php cli.phar iblock.type:delete content
+php cli.phar iblock.type:delete --remote=prod content
+```
+
 ## `php:exec [--remote=<codename>] [--local]`
 
 Читает PHP-код из stdin и выполняет его после подключения ядра Bitrix. Без `--remote` код исполняется локально; с `--remote` отправляется в зарегистрированный удалённый проект. `--local` отключает remote текущей сессии.

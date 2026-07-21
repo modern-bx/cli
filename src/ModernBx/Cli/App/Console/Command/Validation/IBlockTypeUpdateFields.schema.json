@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Аргумент fields команд iblock.type:add/update",
+  "description": "Допустимые поля JSON-объекта для CIBlockType::Add/Update.",
+  "$mixin": ["../../Validation/Global.schema.json"],
+  "type": "object",
+  "$include": false,
+  "properties": {
+    "ID": { "$ref": "#/$defs/string?" },
+    "SECTIONS": { "$ref": "#/$defs/string?" },
+    "IN_RSS": { "$ref": "#/$defs/string?" },
+    "SORT": { "$ref": "#/$defs/numeric?" },
+    "LANG": { "$ref": "#/$defs/jsonValue" },
+    "LANG_MESSAGE": { "$ref": "#/$defs/jsonValue" },
+    "EDIT_FILE_BEFORE": { "$ref": "#/$defs/string?" },
+    "EDIT_FILE_AFTER": { "$ref": "#/$defs/string?" }
+  }
+}

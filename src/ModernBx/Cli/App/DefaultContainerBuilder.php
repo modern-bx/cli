@@ -18,6 +18,9 @@ use ModernBx\Cli\App\Service\Remote\RemoteDbPhpCodeBuilder;
 use ModernBx\Cli\App\Service\Remote\RemoteFileApplyPhpCodeBuilder;
 use ModernBx\Cli\App\Service\Remote\RemoteFilePhpCodeBuilder;
 use ModernBx\Cli\App\Service\Remote\RemoteIBlockElementPhpCodeBuilder;
+use ModernBx\Cli\App\Service\Remote\RemoteIBlockPhpCodeBuilder;
+use ModernBx\Cli\App\Service\Remote\RemoteIBlockSectionPhpCodeBuilder;
+use ModernBx\Cli\App\Service\Remote\RemoteIBlockTypePhpCodeBuilder;
 use ModernBx\Cli\App\Service\Remote\RemoteModulePhpCodeBuilder;
 use ModernBx\Cli\App\Service\Remote\RemoteOptionPhpCodeBuilder;
 use ModernBx\Cli\App\Service\Remote\RemoteSettingPhpCodeBuilder;
@@ -125,6 +128,15 @@ final class DefaultContainerBuilder
 
         $this->containerBuilder
             ->autowire(RemoteIBlockElementPhpCodeBuilder::class, RemoteIBlockElementPhpCodeBuilder::class);
+
+        $this->containerBuilder
+            ->autowire(RemoteIBlockPhpCodeBuilder::class, RemoteIBlockPhpCodeBuilder::class);
+
+        $this->containerBuilder
+            ->autowire(RemoteIBlockSectionPhpCodeBuilder::class, RemoteIBlockSectionPhpCodeBuilder::class);
+
+        $this->containerBuilder
+            ->autowire(RemoteIBlockTypePhpCodeBuilder::class, RemoteIBlockTypePhpCodeBuilder::class);
 
         $this->containerBuilder
             ->autowire(RemoteSitePhpCodeBuilder::class, RemoteSitePhpCodeBuilder::class);
