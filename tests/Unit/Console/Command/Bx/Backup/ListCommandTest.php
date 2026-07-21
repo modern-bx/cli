@@ -35,11 +35,13 @@ final class ListCommandTest extends TestCase
         self::assertSame('2026-07-20.tar.gz', $items[0]['name']);
         self::assertSame('/bitrix/backup/2026-07-20.tar.gz', $items[0]['path']);
         self::assertSame([1, 2], $items[0]['volumes']);
+        self::assertFalse($items[0]['incomplete']);
+        self::assertNull($items[0]['missing_volume']);
         self::assertSame('2026-07-21.tar.gz', $items[1]['name']);
         self::assertSame([], $items[1]['volumes']);
     }
 
-    public function testFailsWhenVolumeNumbersHaveGap(): void
+    public function testMarksBackupWithMissingVolumeAsIncomplete(): void
     {
         $documentRoot = $this->createDocumentRoot();
         $backupDirectory = $documentRoot . '/bitrix/backup';
@@ -47,10 +49,42 @@ final class ListCommandTest extends TestCase
         $this->writeFile($backupDirectory . '/2026-07-20.tar.gz.1', 'volume 1');
         $this->writeFile($backupDirectory . '/2026-07-20.tar.gz.3', 'volume 3');
 
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('ожидается .2, найден .3');
+        $items = $this->runList($documentRoot);
 
-        $this->runList($documentRoot);
+        self::assertCount(1, $items);
+        self::assertSame([1, 3], $items[0]['volumes']);
+        self::assertTrue($items[0]['incomplete']);
+        self::assertSame(2, $items[0]['missing_volume']);
+    }
+
+    public function testDefaultFilterSkipsIncompleteBackups(): void
+    {
+        $items = [
+            ['path' => '/bitrix/backup/complete.tar.gz', 'incomplete' => false],
+            ['path' => '/bitrix/backup/incomplete.tar.gz', 'incomplete' => true],
+        ];
+
+        self::assertSame([$items[0]], $this->filterItems($items, false, false));
+    }
+
+    public function testListAllFilterKeepsIncompleteBackups(): void
+    {
+        $items = [
+            ['path' => '/bitrix/backup/complete.tar.gz', 'incomplete' => false],
+            ['path' => '/bitrix/backup/incomplete.tar.gz', 'incomplete' => true],
+        ];
+
+        self::assertSame($items, $this->filterItems($items, true, false));
+    }
+
+    public function testListIncompleteFilterKeepsOnlyIncompleteBackups(): void
+    {
+        $items = [
+            ['path' => '/bitrix/backup/complete.tar.gz', 'incomplete' => false],
+            ['path' => '/bitrix/backup/incomplete.tar.gz', 'incomplete' => true],
+        ];
+
+        self::assertSame([$items[1]], $this->filterItems($items, false, true));
     }
 
     /** @return list<array<string, mixed>> */
@@ -63,6 +97,22 @@ final class ListCommandTest extends TestCase
         $method = new \ReflectionMethod(ListCommand::class, 'executeLocal');
         $method->setAccessible(true);
         $result = $method->invoke($command);
+
+        self::assertIsArray($result);
+
+        return $result;
+    }
+
+    /**
+     * @param list<array<string, mixed>> $items
+     * @return list<array<string, mixed>>
+     */
+    private function filterItems(array $items, bool $listAll, bool $listIncomplete): array
+    {
+        $command = new ListCommand();
+        $method = new \ReflectionMethod(ListCommand::class, 'filterItems');
+        $method->setAccessible(true);
+        $result = $method->invoke($command, $items, $listAll, $listIncomplete);
 
         self::assertIsArray($result);
 

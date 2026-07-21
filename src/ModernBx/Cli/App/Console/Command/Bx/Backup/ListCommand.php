@@ -6,9 +6,8 @@ namespace ModernBx\Cli\App\Console\Command\Bx\Backup;
 
 use ModernBx\Cli\App\Console\Command\BxCommand;
 use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
-
-use function ModernBx\CommonFunctions\to_json;
 
 final class ListCommand extends BxCommand
 {
@@ -22,6 +21,18 @@ final class ListCommand extends BxCommand
             ->setHelp(
                 'Сканирует /bitrix/backup, выводит основные .gz-файлы без номера тома и проверяет, '
                 . 'что дополнительные тома идут по порядку без пропусков.',
+            )
+            ->addOption(
+                'list-all',
+                null,
+                InputOption::VALUE_NONE,
+                'Вывести все основные файлы, включая резервные копии с пропущенными томами',
+            )
+            ->addOption(
+                'list-incomplete',
+                null,
+                InputOption::VALUE_NONE,
+                'Вывести только резервные копии с пропущенными томами',
             );
     }
 
@@ -29,7 +40,17 @@ final class ListCommand extends BxCommand
     {
         parent::executeInternal($input, $output);
 
-        $this->printer->info($this->encodeItems($this->executeLocal()));
+        $listAll = $input->getOption('list-all') === true;
+        $listIncomplete = $input->getOption('list-incomplete') === true;
+
+        if ($listAll && $listIncomplete) {
+            throw new \RuntimeException(
+                'Опции --list-all и --list-incomplete нельзя указывать одновременно.',
+                static::CODE_INVALID_OPTION_VALUE,
+            );
+        }
+
+        $this->printItems($this->filterItems($this->executeLocal(), $listAll, $listIncomplete));
     }
 
     /** @return list<array<string, mixed>> */
@@ -75,38 +96,73 @@ final class ListCommand extends BxCommand
             }
 
             $volumes = $this->findVolumes($name, $names, $backupDirectory);
-            $this->assertVolumesSequential($name, $volumes);
-            $items[] = $this->buildItem($documentRoot, $backupDirectory . '/' . $name, $volumes);
+            $items[] = $this->buildItem(
+                $documentRoot,
+                $backupDirectory . '/' . $name,
+                $volumes,
+                $this->findFirstMissingVolume($volumes),
+            );
         }
 
         return $items;
     }
 
-    /** @param list<int> $volumes */
-    protected function assertVolumesSequential(string $name, array $volumes): void
+    /**
+     * @param list<array<string, mixed>> $items
+     * @return list<array<string, mixed>>
+     */
+    protected function filterItems(array $items, bool $listAll, bool $listIncomplete): array
     {
-        foreach ($volumes as $index => $volume) {
-            $expected = $index + 1;
+        return array_values(array_filter(
+            $items,
+            static function (array $item) use ($listAll, $listIncomplete): bool {
+                $incomplete = ($item['incomplete'] ?? false) === true;
 
-            if ($volume !== $expected) {
-                throw new \RuntimeException(
-                    sprintf(
-                        'Тома резервной копии %s идут с пропуском: ожидается .%d, найден .%d.',
-                        $name,
-                        $expected,
-                        $volume,
-                    ),
-                    static::CODE_IO_ERROR,
-                );
+                if ($listIncomplete) {
+                    return $incomplete;
+                }
+
+                if ($listAll) {
+                    return true;
+                }
+
+                return !$incomplete;
+            },
+        ));
+    }
+
+    /** @param list<array<string, mixed>> $items */
+    protected function printItems(array $items): void
+    {
+        foreach ($items as $item) {
+            $line = $this->formatItem($item);
+
+            if (($item['incomplete'] ?? false) === true) {
+                $this->printer->error($line);
+                continue;
             }
+
+            $this->printer->info($line);
         }
+    }
+
+    /** @param array<string, mixed> $item */
+    protected function formatItem(array $item): string
+    {
+        $path = $item['path'] ?? '';
+
+        if (!is_scalar($path)) {
+            return '';
+        }
+
+        return (string) $path;
     }
 
     /**
      * @param list<int> $volumes
      * @return array<string, mixed>
      */
-    protected function buildItem(string $documentRoot, string $path, array $volumes): array
+    protected function buildItem(string $documentRoot, string $path, array $volumes, ?int $missingVolume): array
     {
         $stat = stat($path);
 
@@ -122,12 +178,28 @@ final class ListCommand extends BxCommand
             'size' => (int) $stat['size'],
             'mtime' => (int) $stat['mtime'],
             'volumes' => $volumes,
+            'incomplete' => $missingVolume !== null,
+            'missing_volume' => $missingVolume,
         ];
     }
 
     protected function isMainBackupName(string $name): bool
     {
         return preg_match('/\.gz$/', $name) === 1;
+    }
+
+    /** @param list<int> $volumes */
+    protected function findFirstMissingVolume(array $volumes): ?int
+    {
+        foreach ($volumes as $index => $volume) {
+            $expected = $index + 1;
+
+            if ($volume !== $expected) {
+                return $expected;
+            }
+        }
+
+        return null;
     }
 
     /**
@@ -156,17 +228,5 @@ final class ListCommand extends BxCommand
         sort($volumes, SORT_NUMERIC);
 
         return $volumes;
-    }
-
-    /** @param list<array<string, mixed>> $items */
-    protected function encodeItems(array $items): string
-    {
-        $flags = JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES;
-
-        if (defined('JSON_INVALID_UTF8_SUBSTITUTE')) {
-            $flags |= JSON_INVALID_UTF8_SUBSTITUTE;
-        }
-
-        return (string) to_json($items, $flags);
     }
 }
