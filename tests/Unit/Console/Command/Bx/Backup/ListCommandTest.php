@@ -90,6 +90,21 @@ final class ListCommandTest extends TestCase
         self::assertSame([$items[1]], $this->filterItems($items, false, true));
     }
 
+    public function testFormatsBackupByShortName(): void
+    {
+        $command = $this->createCommand();
+        $method = new \ReflectionMethod(ListCommand::class, 'formatItem');
+        $method->setAccessible(true);
+
+        self::assertSame(
+            '2026-07-20.tar.gz',
+            $method->invoke($command, [
+                'name' => '2026-07-20.tar.gz',
+                'path' => '/bitrix/backup/2026-07-20.tar.gz',
+            ]),
+        );
+    }
+
     /** @return list<array<string, mixed>> */
     private function runList(string $documentRoot): array
     {

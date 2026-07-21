@@ -195,13 +195,13 @@ final class ListCommand extends BxCommand
     /** @param array<string, mixed> $item */
     protected function formatItem(array $item): string
     {
-        $path = $item['path'] ?? '';
+        $name = $item['name'] ?? '';
 
-        if (!is_scalar($path)) {
+        if (!is_scalar($name)) {
             return '';
         }
 
-        return (string) $path;
+        return (string) $name;
     }
 
     /**
