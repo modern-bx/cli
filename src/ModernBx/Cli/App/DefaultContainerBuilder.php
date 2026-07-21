@@ -13,6 +13,7 @@ use ModernBx\Cli\App\Service\Remote\BitrixAdminClient;
 use ModernBx\Cli\App\Service\Remote\ProjectNameGenerator;
 use ModernBx\Cli\App\Service\Remote\ProjectRegistry;
 use ModernBx\Cli\App\Service\Remote\RemoteProjectConfigManager;
+use ModernBx\Cli\App\Service\Remote\RemoteBackupPhpCodeBuilder;
 use ModernBx\Cli\App\Service\Remote\RemoteCachePhpCodeBuilder;
 use ModernBx\Cli\App\Service\Remote\RemoteDbPhpCodeBuilder;
 use ModernBx\Cli\App\Service\Remote\RemoteFileApplyPhpCodeBuilder;
@@ -101,6 +102,9 @@ final class DefaultContainerBuilder
 
         $this->containerBuilder
             ->autowire(RemoteProjectConfigManager::class, RemoteProjectConfigManager::class);
+
+        $this->containerBuilder
+            ->autowire(RemoteBackupPhpCodeBuilder::class, RemoteBackupPhpCodeBuilder::class);
 
         $this->containerBuilder
             ->autowire(RemoteCachePhpCodeBuilder::class, RemoteCachePhpCodeBuilder::class);

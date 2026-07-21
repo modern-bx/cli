@@ -74,6 +74,14 @@ php cli.phar cfile:save --short upload/logo.png
 php cli.phar cfile:save --remote=prod upload/logo.png
 ```
 
+## `cfile:get [--remote=<codename>] [--local] <ID>`
+
+Возвращает JSON с результатом `CFile::GetFileArray()` для указанного ID. Если запись с таким ID не найдена в `b_file`, команда завершается ошибкой.
+
+```bash
+php cli.phar cfile:get 123
+php cli.phar cfile:get --remote=prod 123
+```
 
 ## `cfile:delete [--remote=<codename>] [--local] [--force] <ID>`
 
