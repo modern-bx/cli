@@ -5,6 +5,9 @@ declare(strict_types=1);
 namespace ModernBx\Cli\App\Console\Command\Bx\Backup;
 
 use ModernBx\Cli\App\Console\Command\BxCommand;
+use ModernBx\Cli\App\Service\Remote\BitrixAdminClient;
+use ModernBx\Cli\App\Service\Remote\RemotePhpTrait;
+use ModernBx\Cli\App\Service\Remote\RemoteProjectConfigManager;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
@@ -12,14 +15,28 @@ use Symfony\Component\Console\Output\OutputInterface;
 
 final class GetCommand extends BxCommand
 {
+    use RemotePhpTrait;
+
     /** @var string */
     protected static $defaultName = 'backup:get';
+
+    public function __construct(
+        RemoteProjectConfigManager $remoteProjectConfigManager,
+        BitrixAdminClient $bitrixAdminClient
+    ) {
+        parent::__construct();
+
+        $this->remoteProjectConfigManager = $remoteProjectConfigManager;
+        $this->bitrixAdminClient = $bitrixAdminClient;
+    }
 
     protected function configure(): void
     {
         $this
             ->setDescription('Скачивает все тома резервной копии Bitrix')
             ->setHelp('Копирует основной файл резервной копии из /bitrix/backup и все найденные номерные тома.')
+            ->addOption('remote', null, InputOption::VALUE_REQUIRED, 'Кодовое имя удаленного проекта')
+            ->addOption('local', null, InputOption::VALUE_NONE, 'Отключить неявный remote текущей сессии')
             ->addOption('force', null, InputOption::VALUE_NONE, 'Перезаписывать существующие файлы назначения')
             ->addArgument('backup', InputArgument::REQUIRED, 'Короткое имя основного файла резервной копии')
             ->addArgument('dest', InputArgument::REQUIRED, 'Локальная директория назначения');
@@ -27,8 +44,7 @@ final class GetCommand extends BxCommand
 
     protected function executeInternal(InputInterface $input, OutputInterface $output): void
     {
-        parent::executeInternal($input, $output);
-
+        $remote = $input->getOption('remote');
         $backupArgument = $input->getArgument('backup');
         $destArgument = $input->getArgument('dest');
 
@@ -39,11 +55,139 @@ final class GetCommand extends BxCommand
             );
         }
 
-        $this->executeLocal(
-            $this->normalizeBackupName($backupArgument),
-            $destArgument,
-            $input->getOption('force') === true,
+        $backupName = $this->normalizeBackupName($backupArgument);
+        $force = $input->getOption('force') === true;
+
+        if (is_string($remote)) {
+            $this->printer = $this->getPrinter($output);
+            $this->verbose = $input->getOption('verbose') !== false;
+            $this->executeRemote($remote, $backupName, $destArgument, $force);
+            return;
+        }
+
+        parent::executeInternal($input, $output);
+        $this->executeLocal($backupName, $destArgument, $force);
+    }
+
+
+    protected function executeRemote(
+        string $codename,
+        string $backupName,
+        string $destinationDirectory,
+        bool $force
+    ): void {
+        $this->ensureDestinationDirectory($destinationDirectory);
+        $remotePaths = $this->fetchRemoteVolumePaths($codename, $backupName);
+        $config = $this->remoteProjectConfigManager->load($codename);
+        $endpoint = $this->remoteProjectConfigManager->getEndpoint($config);
+        $sessionId = $this->remoteProjectConfigManager->getSessionId($config);
+
+        if ($sessionId === '') {
+            $sessionId = $this->remoteProjectConfigManager->refreshSession($codename, $config);
+        }
+
+        $totalBytes = 0;
+
+        foreach ($remotePaths as $remotePath) {
+            $destinationPath = rtrim($destinationDirectory, DIRECTORY_SEPARATOR)
+                . DIRECTORY_SEPARATOR
+                . basename($remotePath);
+
+            if (file_exists($destinationPath) && !$force) {
+                throw new \RuntimeException(
+                    sprintf('Файл уже существует: %s', $destinationPath),
+                    static::CODE_IO_ERROR,
+                );
+            }
+
+            try {
+                $this->bitrixAdminClient->downloadFile(
+                    $endpoint,
+                    $sessionId,
+                    $remotePath,
+                    $destinationPath,
+                    static fn (int $contentLength): ?callable => null,
+                );
+            } catch (\RuntimeException $err) {
+                if ($err->getMessage() !== 'REMOTE_SESSION_EXPIRED') {
+                    throw $err;
+                }
+
+                $sessionId = $this->remoteProjectConfigManager->refreshSession($codename, $config);
+                $this->bitrixAdminClient->downloadFile(
+                    $endpoint,
+                    $sessionId,
+                    $remotePath,
+                    $destinationPath,
+                    static fn (int $contentLength): ?callable => null,
+                );
+            }
+
+            $bytes = $this->readFileSize($destinationPath);
+            $totalBytes += $bytes;
+            $this->printProgress(basename($remotePath), $bytes, $totalBytes);
+        }
+    }
+
+    /** @return list<string> */
+    protected function fetchRemoteVolumePaths(string $codename, string $backupName): array
+    {
+        $result = $this->decodeRemoteJsonResult(
+            $this->executeRemotePhp($codename, $this->buildRemoteVolumeListCode($backupName)),
+            'Не удалось получить список томов резервной копии удаленного проекта.',
         );
+
+        if (!is_array($result)) {
+            throw new \RuntimeException('Удаленная PHP-консоль вернула некорректный список томов.');
+        }
+
+        return array_values(array_filter($result, 'is_string'));
+    }
+
+    protected function buildRemoteVolumeListCode(string $backupName): string
+    {
+        return strtr(<<<'PHP'
+$backupName = '__BACKUP_NAME__';
+$send = static function (array $payload): void {
+    echo json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?: '{"ok":false}';
+};
+
+try {
+    $documentRoot = rtrim((string) ($_SERVER['DOCUMENT_ROOT'] ?? ''), '/');
+
+    if ($documentRoot === '') {
+        throw new \RuntimeException('DOCUMENT_ROOT не определен.');
+    }
+
+    $backupDirectory = $documentRoot . '/bitrix/backup';
+    $mainPath = $backupDirectory . '/' . $backupName;
+
+    if (!is_file($mainPath)) {
+        throw new \RuntimeException('Основной файл резервной копии не найден: ' . $backupName);
+    }
+
+    $paths = ['/bitrix/backup/' . $backupName];
+    $volumePaths = glob($mainPath . '.*') ?: [];
+    $volumes = [];
+
+    foreach ($volumePaths as $path) {
+        $suffix = substr($path, strlen($mainPath) + 1);
+
+        if (!ctype_digit($suffix) || (int) $suffix <= 0 || !is_file($path)) {
+            continue;
+        }
+
+        $volumes[(int) $suffix] = '/bitrix/backup/' . basename($path);
+    }
+
+    ksort($volumes, SORT_NUMERIC);
+    $send(['ok' => true, 'result' => array_merge($paths, array_values($volumes))]);
+} catch (\Throwable $err) {
+    $send(['ok' => false, 'error' => $err->getMessage()]);
+}
+PHP, [
+            '__BACKUP_NAME__' => addslashes($backupName),
+        ]);
     }
 
     protected function executeLocal(string $backupName, string $destinationDirectory, bool $force): void
@@ -77,12 +221,7 @@ final class GetCommand extends BxCommand
             $bytes = $this->copyVolume($sourcePath, $destinationPath);
             $totalBytes += $bytes;
 
-            $this->printer->info(sprintf(
-                'Скачан том %s: %s, всего %s.',
-                basename($sourcePath),
-                $this->formatBytes($bytes),
-                $this->formatBytes($totalBytes),
-            ));
+            $this->printProgress(basename($sourcePath), $bytes, $totalBytes);
         }
     }
 
@@ -183,16 +322,32 @@ final class GetCommand extends BxCommand
             );
         }
 
-        $size = filesize($destinationPath);
+        return $this->readFileSize($destinationPath);
+    }
+
+
+    protected function readFileSize(string $path): int
+    {
+        $size = filesize($path);
 
         if ($size === false) {
             throw new \RuntimeException(
-                sprintf('Не удалось определить размер скачанного тома: %s', basename($destinationPath)),
+                sprintf('Не удалось определить размер скачанного тома: %s', basename($path)),
                 static::CODE_IO_ERROR,
             );
         }
 
         return $size;
+    }
+
+    protected function printProgress(string $name, int $bytes, int $totalBytes): void
+    {
+        $this->printer->info(sprintf(
+            'Скачан том %s: %s, всего %s.',
+            $name,
+            $this->formatBytes($bytes),
+            $this->formatBytes($totalBytes),
+        ));
     }
 
     protected function formatBytes(int $bytes): string

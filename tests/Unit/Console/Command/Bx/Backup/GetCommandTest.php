@@ -6,6 +6,8 @@ namespace ModernBx\Cli\Tests\Unit\Console\Command\Bx\Backup;
 
 use ModernBx\Cli\App\Console\Command\Bx\Backup\GetCommand;
 use ModernBx\Cli\Common\Console\Printer;
+use ModernBx\Cli\App\Service\Remote\BitrixAdminClient;
+use ModernBx\Cli\App\Service\Remote\RemoteProjectConfigManager;
 use ModernBx\Url\UrlImmutable;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Output\BufferedOutput;
@@ -79,7 +81,7 @@ final class GetCommandTest extends TestCase
 
     public function testRejectsBackupNameWithPath(): void
     {
-        $command = new GetCommand();
+        $command = $this->createCommand();
         $method = new \ReflectionMethod(GetCommand::class, 'normalizeBackupName');
         $method->setAccessible(true);
 
@@ -91,7 +93,7 @@ final class GetCommandTest extends TestCase
 
     private function runGet(string $documentRoot, string $backup, string $destinationDirectory, bool $force): string
     {
-        $command = new GetCommand();
+        $command = $this->createCommand();
         $output = new BufferedOutput();
         $documentRootProperty = new \ReflectionProperty(GetCommand::class, 'documentRoot');
         $documentRootProperty->setAccessible(true);
@@ -104,6 +106,17 @@ final class GetCommandTest extends TestCase
         $method->invoke($command, $backup, $destinationDirectory, $force);
 
         return $output->fetch();
+    }
+
+
+    private function createCommand(): GetCommand
+    {
+        $reflection = new \ReflectionClass(RemoteProjectConfigManager::class);
+        $configManager = $reflection->newInstanceWithoutConstructor();
+        $reflection = new \ReflectionClass(BitrixAdminClient::class);
+        $bitrixAdminClient = $reflection->newInstanceWithoutConstructor();
+
+        return new GetCommand($configManager, $bitrixAdminClient);
     }
 
     private function createDocumentRoot(): string

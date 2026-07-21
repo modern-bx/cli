@@ -5,14 +5,29 @@ declare(strict_types=1);
 namespace ModernBx\Cli\App\Console\Command\Bx\Backup;
 
 use ModernBx\Cli\App\Console\Command\BxCommand;
+use ModernBx\Cli\App\Service\Remote\BitrixAdminClient;
+use ModernBx\Cli\App\Service\Remote\RemotePhpTrait;
+use ModernBx\Cli\App\Service\Remote\RemoteProjectConfigManager;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 
 final class ListCommand extends BxCommand
 {
+    use RemotePhpTrait;
+
     /** @var string */
     protected static $defaultName = 'backup:list';
+
+    public function __construct(
+        RemoteProjectConfigManager $remoteProjectConfigManager,
+        BitrixAdminClient $bitrixAdminClient
+    ) {
+        parent::__construct();
+
+        $this->remoteProjectConfigManager = $remoteProjectConfigManager;
+        $this->bitrixAdminClient = $bitrixAdminClient;
+    }
 
     protected function configure(): void
     {
@@ -22,6 +37,8 @@ final class ListCommand extends BxCommand
                 'Сканирует /bitrix/backup, выводит основные .gz-файлы без номера тома и проверяет, '
                 . 'что дополнительные тома идут по порядку без пропусков.',
             )
+            ->addOption('remote', null, InputOption::VALUE_REQUIRED, 'Кодовое имя удаленного проекта')
+            ->addOption('local', null, InputOption::VALUE_NONE, 'Отключить неявный remote текущей сессии')
             ->addOption(
                 'list-all',
                 null,
@@ -38,8 +55,7 @@ final class ListCommand extends BxCommand
 
     protected function executeInternal(InputInterface $input, OutputInterface $output): void
     {
-        parent::executeInternal($input, $output);
-
+        $remote = $input->getOption('remote');
         $listAll = $input->getOption('list-all') === true;
         $listIncomplete = $input->getOption('list-incomplete') === true;
 
@@ -50,7 +66,116 @@ final class ListCommand extends BxCommand
             );
         }
 
-        $this->printItems($this->filterItems($this->executeLocal(), $listAll, $listIncomplete));
+        if (is_string($remote)) {
+            $this->printer = $this->getPrinter($output);
+            $this->verbose = $input->getOption('verbose') !== false;
+            $items = $this->executeRemote($remote);
+        } else {
+            parent::executeInternal($input, $output);
+            $items = $this->executeLocal();
+        }
+
+        $this->printItems($this->filterItems($items, $listAll, $listIncomplete));
+    }
+
+
+    /** @return list<array<string, mixed>> */
+    protected function executeRemote(string $codename): array
+    {
+        $result = $this->decodeRemoteJsonResult(
+            $this->executeRemotePhp($codename, $this->buildRemoteListCode()),
+            'Не удалось получить список резервных копий удаленного проекта.',
+        );
+
+        if (!is_array($result)) {
+            throw new \RuntimeException('Удаленная PHP-консоль вернула некорректный список резервных копий.');
+        }
+
+        return array_values(array_filter($result, 'is_array'));
+    }
+
+    protected function buildRemoteListCode(): string
+    {
+        return <<<'PHP'
+$send = static function (array $payload): void {
+    echo json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?: '{"ok":false}';
+};
+
+$findFirstMissingVolume = static function (array $volumes): ?int {
+    foreach (array_values($volumes) as $index => $volume) {
+        $expected = $index + 1;
+
+        if ((int) $volume !== $expected) {
+            return $expected;
+        }
+    }
+
+    return null;
+};
+
+try {
+    $documentRoot = rtrim((string) ($_SERVER['DOCUMENT_ROOT'] ?? ''), '/');
+
+    if ($documentRoot === '') {
+        throw new \RuntimeException('DOCUMENT_ROOT не определен.');
+    }
+
+    $backupDirectory = $documentRoot . '/bitrix/backup';
+
+    if (!is_dir($backupDirectory)) {
+        throw new \RuntimeException('Директория резервных копий не найдена: /bitrix/backup');
+    }
+
+    $entries = scandir($backupDirectory) ?: [];
+    $names = array_values(array_filter(
+        $entries,
+        static fn (string $entry): bool => $entry !== '.' && $entry !== '..'
+    ));
+    sort($names, SORT_STRING);
+    $items = [];
+
+    foreach ($names as $name) {
+        $path = $backupDirectory . '/' . $name;
+
+        if (preg_match('/\.gz$/', $name) !== 1 || !is_file($path)) {
+            continue;
+        }
+
+        $volumes = [];
+        $pattern = '/^' . preg_quote($name, '/') . '\.(\d+)$/';
+
+        foreach ($names as $volumeName) {
+            $volumePath = $backupDirectory . '/' . $volumeName;
+
+            if (preg_match($pattern, $volumeName, $matches) !== 1 || !is_file($volumePath)) {
+                continue;
+            }
+
+            $number = (int) $matches[1];
+
+            if ($number > 0) {
+                $volumes[] = $number;
+            }
+        }
+
+        sort($volumes, SORT_NUMERIC);
+        $missingVolume = $findFirstMissingVolume($volumes);
+        $items[] = [
+            'name' => $name,
+            'path' => '/bitrix/backup/' . $name,
+            'size' => (int) filesize($path),
+            'mtime' => (int) filemtime($path),
+            'volumes' => $volumes,
+            'incomplete' => $missingVolume !== null,
+            'missing_volume' => $missingVolume,
+        ];
+    }
+
+    $send(['ok' => true, 'result' => $items]);
+} catch (\Throwable $err) {
+    $send(['ok' => false, 'error' => $err->getMessage()]);
+}
+PHP;
     }
 
     /** @return list<array<string, mixed>> */

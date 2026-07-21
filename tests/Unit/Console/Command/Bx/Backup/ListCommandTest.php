@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace ModernBx\Cli\Tests\Unit\Console\Command\Bx\Backup;
 
 use ModernBx\Cli\App\Console\Command\Bx\Backup\ListCommand;
+use ModernBx\Cli\App\Service\Remote\BitrixAdminClient;
+use ModernBx\Cli\App\Service\Remote\RemoteProjectConfigManager;
 use ModernBx\Url\UrlImmutable;
 use PHPUnit\Framework\TestCase;
 
@@ -90,7 +92,7 @@ final class ListCommandTest extends TestCase
     /** @return list<array<string, mixed>> */
     private function runList(string $documentRoot): array
     {
-        $command = new ListCommand();
+        $command = $this->createCommand();
         $property = new \ReflectionProperty(ListCommand::class, 'documentRoot');
         $property->setAccessible(true);
         $property->setValue($command, UrlImmutable::create($documentRoot));
@@ -109,7 +111,7 @@ final class ListCommandTest extends TestCase
      */
     private function filterItems(array $items, bool $listAll, bool $listIncomplete): array
     {
-        $command = new ListCommand();
+        $command = $this->createCommand();
         $method = new \ReflectionMethod(ListCommand::class, 'filterItems');
         $method->setAccessible(true);
         $result = $method->invoke($command, $items, $listAll, $listIncomplete);
@@ -117,6 +119,17 @@ final class ListCommandTest extends TestCase
         self::assertIsArray($result);
 
         return $result;
+    }
+
+
+    private function createCommand(): ListCommand
+    {
+        $reflection = new \ReflectionClass(RemoteProjectConfigManager::class);
+        $configManager = $reflection->newInstanceWithoutConstructor();
+        $reflection = new \ReflectionClass(BitrixAdminClient::class);
+        $bitrixAdminClient = $reflection->newInstanceWithoutConstructor();
+
+        return new ListCommand($configManager, $bitrixAdminClient);
     }
 
     private function createDocumentRoot(): string
