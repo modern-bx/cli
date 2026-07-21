@@ -6,6 +6,7 @@
 
 - `backup:list` — выводит основные файлы резервных копий из `/bitrix/backup`.
 - `backup:get` — скачивает основной файл резервной копии и все его тома.
+- `backup:put` — загружает локальный файл резервной копии и все его тома в `/bitrix/backup`.
 - `backup:extract` — распаковывает архив резервной копии Bitrix.
 - `cache:clear` — очищает кеш Bitrix.
 - `module:install`, `module:uninstall`, `module:reinstall`, `module:version` — управляют жизненным циклом модулей.

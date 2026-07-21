@@ -22,6 +22,13 @@ final class RemoteBackupPhpCodeBuilder
         ]);
     }
 
+    public function buildExists(string $filename): string
+    {
+        return strtr($this->build('remote_backup_exists.php'), [
+            "'__BX_CLI_BACKUP_FILENAME__'" => var_export($filename, true),
+        ]);
+    }
+
     private function build(string $filename): string
     {
         $snippet = file_get_contents(self::SNIPPET_DIR . '/' . $filename);

@@ -23,6 +23,17 @@ php cli.phar backup:get --force 2026-07-20.tar.gz ./backups
 php cli.phar backup:get --remote=prod 2026-07-20.tar.gz ./backups
 ```
 
+
+## `backup:put [--remote=<codename>] [--local] [--force] <src>`
+
+Загружает локальный основной файл резервной копии и все найденные рядом номерные тома (`.1`, `.2`, `.3`, ...) в `/bitrix/backup` локального или удаленного проекта. Аргумент `src` — полный или относительный путь к локальному основному файлу, например `./backups/2026-07-20.tar.gz`. Перед загрузкой команда проверяет последовательность томов; при пропусках завершается ошибкой, кроме режима `--force`. Если файл уже существует в `/bitrix/backup`, команда завершается ошибкой; с `--force` файл перезаписывается. После каждого тома печатается текстовый прогресс с размером загруженного тома и суммарным размером.
+
+```bash
+php cli.phar backup:put ./backups/2026-07-20.tar.gz
+php cli.phar backup:put --force ./backups/2026-07-20.tar.gz
+php cli.phar backup:put --remote=prod ./backups/2026-07-20.tar.gz
+```
+
 ## `backup:extract [--password=<password>] <archive> <destination>`
 
 Распаковывает tar-архив резервной копии Bitrix в каталог назначения. Для зашифрованных архивов передайте пароль через `--password`.
