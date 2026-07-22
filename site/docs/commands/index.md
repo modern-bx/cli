@@ -47,5 +47,5 @@
 
 ## Remote
 
-- `remote:register`, `remote:list`, `remote:delete` — управляют registry удалённых проектов.
+- `remote:register`, `remote:list`, `remote:rename`, `remote:delete` — управляют registry удалённых проектов.
 - `session:remote` — печатает shell-команду для выбора remote в текущей терминальной сессии.

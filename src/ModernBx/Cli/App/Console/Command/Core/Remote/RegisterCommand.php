@@ -57,7 +57,7 @@ class RegisterCommand extends AppCommand
         $endpoint = $input->getArgument('endpoint');
         $endpoint = $this->normalizeEndpoint($endpoint);
         $projectsDir = $this->getProjectsDir();
-        $projectName = $this->resolveProjectName($input, $projectsDir);
+        $projectName = $this->resolveProjectName($input, $projectsDir, $endpoint);
         $configFile = $this->getProjectConfigFile($projectsDir, $projectName);
 
         if (is_file($configFile)) {
@@ -119,7 +119,7 @@ class RegisterCommand extends AppCommand
         return $normalized;
     }
 
-    protected function resolveProjectName(InputInterface $input, string $projectsDir): string
+    protected function resolveProjectName(InputInterface $input, string $projectsDir, string $endpoint): string
     {
         /** @var string|null $codename */
         $codename = $input->getArgument('codename');
@@ -136,6 +136,16 @@ class RegisterCommand extends AppCommand
             }
 
             return $codename;
+        }
+
+        $host = parse_url($endpoint, PHP_URL_HOST);
+
+        if (is_string($host)) {
+            $host = strtolower($host);
+
+            if ($this->isValidProjectName($host) && !$this->projectConfigExists($projectsDir, $host)) {
+                return $host;
+            }
         }
 
         return $this->generateProjectName($projectsDir);

@@ -2,12 +2,12 @@
 
 Remote-команды управляют списком зарегистрированных удалённых Bitrix-проектов и выбором проекта для текущей shell-сессии.
 
-## `remote:register <endpoint> <login> <password> [--name=<codename>]`
+## `remote:register <endpoint> [codename]`
 
-Регистрирует удалённый проект. Команда авторизуется в админке, сохраняет endpoint, учётные данные и PHPSESSID. Если `--name` не передан, имя генерируется автоматически.
+Регистрирует удалённый проект. Команда авторизуется в админке, сохраняет endpoint, учётные данные и PHPSESSID. Если `codename` не передан, по умолчанию используется host endpoint. Если такой код уже занят или host не подходит под правила имени, имя генерируется автоматически.
 
 ```bash
-php cli.phar remote:register https://example.org admin 'secret' --name=prod
+php cli.phar remote:register https://example.org prod
 ```
 
 Правила имени: латинские буквы в нижнем регистре, цифры, точки, подчёркивания и дефисы; имя должно начинаться с буквы или цифры.
@@ -18,6 +18,14 @@ php cli.phar remote:register https://example.org admin 'secret' --name=prod
 
 ```bash
 php cli.phar remote:list
+```
+
+## `remote:rename <prev> <next>`
+
+Переименовывает зарегистрированный проект в локальном registry. Если `prev` не существует или `next` уже занят, команда завершается ошибкой.
+
+```bash
+php cli.phar remote:rename prod stage
 ```
 
 ## `remote:delete <codename>`
