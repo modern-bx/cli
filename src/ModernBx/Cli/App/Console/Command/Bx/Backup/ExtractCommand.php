@@ -28,6 +28,11 @@ final class ExtractCommand extends AppCommand
             ]));
     }
 
+    protected function shouldIgnoreSessionRemote(): bool
+    {
+        return true;
+    }
+
     protected function executeInternal(InputInterface $input, OutputInterface $output): void
     {
         parent::executeInternal($input, $output);
