@@ -115,7 +115,7 @@ _bx_cli()
     fi
 
     case "${COMP_WORDS[1]}" in
-        session:remote|remote:delete|remote:rename)
+        session:remote|remote:delete|remote:rename|remote:show-config)
             mapfile -t COMPREPLY < <(compgen -W "$(_bx_cli_remotes)" -- "$cur")
             return 0
             ;;
