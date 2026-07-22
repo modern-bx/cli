@@ -101,6 +101,36 @@ final class ProjectRegistry
         chmod($file, 0600);
     }
 
+
+    public function rename(string $prev, string $next): void
+    {
+        if (!$this->isValidCodename($next)) {
+            throw new \RuntimeException(
+                'Кодовое имя проекта должно содержать только латинские буквы, цифры, точки, дефисы и подчеркивания.',
+            );
+        }
+
+        if (!$this->exists($prev)) {
+            throw new \RuntimeException(sprintf('Проект не зарегистрирован: %s', $prev));
+        }
+
+        if ($this->exists($next)) {
+            throw new \RuntimeException(sprintf('Кодовое имя проекта уже занято: %s', $next));
+        }
+
+        $prevDir = dirname($this->getConfigFile($prev));
+        $nextDir = dirname($this->getConfigFile($next));
+
+        if (!rename($prevDir, $nextDir)) {
+            throw new \RuntimeException(sprintf('Не удалось переименовать проект %s в %s.', $prev, $next));
+        }
+    }
+
+    public function isValidCodename(string $codename): bool
+    {
+        return (bool) preg_match('/^[a-z0-9][a-z0-9._-]*$/', $codename);
+    }
+
     public function delete(string $codename): void
     {
         $dir = dirname($this->getConfigFile($codename));

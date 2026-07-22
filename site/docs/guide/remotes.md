@@ -13,10 +13,10 @@
 ## Регистрация
 
 ```bash
-php cli.phar remote:register https://example.org admin password --name prod
+php cli.phar remote:register https://example.org prod
 ```
 
-Команда нормализует endpoint, авторизуется в `/bitrix/admin/`, сохраняет имя проекта, endpoint, учётные данные и PHPSESSID.
+Команда нормализует endpoint, авторизуется в `/bitrix/admin/`, сохраняет имя проекта, endpoint, учётные данные и PHPSESSID. Если кодовое имя не передано, по умолчанию используется host endpoint.
 
 ## Выбор remote для сессии
 

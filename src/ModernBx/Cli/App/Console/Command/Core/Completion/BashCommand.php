@@ -114,10 +114,12 @@ _bx_cli()
         return 0
     fi
 
-    if [[ "${COMP_WORDS[1]}" == session:remote || "${COMP_WORDS[1]}" == remote:delete ]]; then
-        mapfile -t COMPREPLY < <(compgen -W "$(_bx_cli_remotes)" -- "$cur")
-        return 0
-    fi
+    case "${COMP_WORDS[1]}" in
+        session:remote|remote:delete|remote:rename)
+            mapfile -t COMPREPLY < <(compgen -W "$(_bx_cli_remotes)" -- "$cur")
+            return 0
+            ;;
+    esac
 
     if [[ "$cur" == -* ]]; then
         mapfile -t COMPREPLY < <(compgen -W "$(_bx_cli_options "${COMP_WORDS[1]}")" -- "$cur")
