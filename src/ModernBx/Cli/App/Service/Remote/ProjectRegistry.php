@@ -118,12 +118,27 @@ final class ProjectRegistry
             throw new \RuntimeException(sprintf('Кодовое имя проекта уже занято: %s', $next));
         }
 
+        $config = $this->load($prev);
+        $data = $config['data'] ?? null;
+
+        if (is_array($data)) {
+            $project = $data['project'] ?? null;
+
+            if (is_array($project)) {
+                $project['name'] = $next;
+                $data['project'] = $project;
+                $config['data'] = $data;
+            }
+        }
+
         $prevDir = dirname($this->getConfigFile($prev));
         $nextDir = dirname($this->getConfigFile($next));
 
         if (!rename($prevDir, $nextDir)) {
             throw new \RuntimeException(sprintf('Не удалось переименовать проект %s в %s.', $prev, $next));
         }
+
+        $this->save($next, $config);
     }
 
     public function isValidCodename(string $codename): bool

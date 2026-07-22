@@ -10,6 +10,7 @@ use ModernBx\Cli\App\Service\Remote\ProjectRegistry;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Application;
 use Symfony\Component\Console\Tester\CommandTester;
+use Symfony\Component\Yaml\Yaml;
 
 final class RenameCommandTest extends TestCase
 {
@@ -55,6 +56,10 @@ final class RenameCommandTest extends TestCase
         self::assertSame(AppCommand::CODE_SUCCESS, $exitCode, $tester->getDisplay());
         self::assertFileDoesNotExist($this->projectFile('prod'));
         self::assertFileExists($this->projectFile('stage'));
+
+        $config = Yaml::parseFile($this->projectFile('stage'));
+        self::assertIsArray($config);
+        self::assertSame('stage', $config['data']['project']['name'] ?? null);
     }
 
     public function testRemoteRenameFailsWhenPreviousProjectDoesNotExist(): void
@@ -89,7 +94,7 @@ final class RenameCommandTest extends TestCase
     {
         $file = $this->projectFile($codename);
         mkdir(dirname($file), 0700, true);
-        file_put_contents($file, 'meta: []' . PHP_EOL);
+        file_put_contents($file, Yaml::dump(['data' => ['project' => ['name' => $codename]]], 4, 2));
     }
 
     private function projectFile(string $codename): string
