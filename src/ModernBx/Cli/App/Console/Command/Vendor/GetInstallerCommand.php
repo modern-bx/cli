@@ -14,7 +14,7 @@ final class GetInstallerCommand extends Command
     protected static $defaultName = 'vendor:get-installer';
 
     private const BASE_URL = 'https://www.1c-bitrix.ru/download/';
-    private const CACHE_DIRECTORY = '.config/bx-cli/cache/vendor-get-installler/distro';
+    private const CACHE_DIRECTORY = '.config/bx-cli/cache/vendor-get-installer/distro';
 
     /** @var array<string, array<string, string>> */
     private const EDITIONS = [
