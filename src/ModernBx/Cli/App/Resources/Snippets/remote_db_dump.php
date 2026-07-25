@@ -22,8 +22,13 @@ try {
 
         while ($row = $result->fetch()) {
             $columns = array_map([RemoteDbSnippet::class, 'quoteIdentifier'], array_keys($row));
-            $values = array_map(static fn ($value): string => RemoteDbSnippet::quoteValue($connection, $value), array_values($row));
-            $sql .= 'INSERT INTO ' . $quoted . ' (' . implode(', ', $columns) . ') VALUES (' . implode(', ', $values) . ");\n";
+            $values = array_map(
+                static fn ($value): string => RemoteDbSnippet::quoteValue($connection, $value),
+                array_values($row)
+            );
+            $sql .= 'INSERT INTO ' . $quoted . ' (' . implode(', ', $columns) . ') VALUES ('
+                . implode(', ', $values)
+                . ");\n";
         }
     }
 
