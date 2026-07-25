@@ -58,14 +58,29 @@ final class InstallCommand extends BxCommand
         $path = InstallationPath::resolveForInstall($input->getOption('path'), $strategy);
 
         $remote = $input->getOption('remote');
-        $credentials = $this->installAdminer(is_string($remote) ? $remote : null, $path, $strategy, $input, $output);
+        $remote = is_string($remote) ? $remote : null;
+        $credentials = $this->installAdminer($remote, $path, $strategy, $input, $output);
 
-        $this->printer->info('Adminer установлен: ' . $path . '/' . self::ADMINER_FILENAME);
+        $this->printer->info('Adminer установлен: ' . $this->getInstallationLocation(
+            $credentials['endpoint'],
+            $path,
+            self::ADMINER_FILENAME,
+        ));
         $this->printer->info('Логин: ' . $credentials['login']);
         $this->printer->info('Пароль: ' . $credentials['password']);
     }
 
-    /** @return array{login: string, password: string} */
+    private function getInstallationLocation(?string $endpoint, string $path, string $filename): string
+    {
+        $relativePath = $path . '/' . $filename;
+        if ($endpoint === null) {
+            return $relativePath;
+        }
+
+        return rtrim($endpoint, '/') . '/' . ltrim($relativePath, '/');
+    }
+
+    /** @return array{login: string, password: string, endpoint: string|null} */
     private function installAdminer(
         ?string $remote,
         string $path,
@@ -87,9 +102,10 @@ final class InstallCommand extends BxCommand
         $password = $this->generatePassword();
         $prepared = $this->prepareAdminer($cache, 'admin', $password);
 
+        $endpoint = null;
         try {
             if ($remote !== null) {
-                $this->uploadRemote($remote, $path, $strategy, $prepared);
+                $endpoint = $this->uploadRemote($remote, $path, $strategy, $prepared);
             } else {
                 parent::executeInternal($input, $output);
                 $directory = rtrim($this->getDocumentRoot()->toString(), '/') . $path;
@@ -105,7 +121,7 @@ final class InstallCommand extends BxCommand
             @unlink($prepared);
         }
 
-        return ['login' => 'admin', 'password' => $password];
+        return ['login' => 'admin', 'password' => $password, 'endpoint' => $endpoint];
     }
 
     private function uploadRemote(
@@ -113,7 +129,7 @@ final class InstallCommand extends BxCommand
         string $path,
         PackageStrategy $strategy,
         string $source
-    ): void {
+    ): string {
         $config = $this->remoteProjectConfigManager->load($codename);
         $endpoint = $this->remoteProjectConfigManager->getEndpoint($config);
         $sessionId = $this->remoteProjectConfigManager->getSessionId($config);
@@ -146,6 +162,8 @@ final class InstallCommand extends BxCommand
             $sessionId = $this->remoteProjectConfigManager->refreshSession($codename, $config);
             $this->finalizeRemoteInstall($endpoint, $sessionId, $path, $strategy, $temporaryFilename);
         }
+
+        return $endpoint;
     }
 
     private function finalizeRemoteInstall(

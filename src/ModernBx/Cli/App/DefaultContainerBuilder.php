@@ -10,6 +10,7 @@ use ModernBx\Cli\App\Service\ConfigurationService;
 use ModernBx\Cli\App\Service\DynamicCommandLoader;
 use ModernBx\Cli\App\Service\RuntimeInfo;
 use ModernBx\Cli\App\Service\Vendor\PackageStrategyRegistry;
+use ModernBx\Cli\App\Service\Vendor\AdminerClient;
 use ModernBx\Cli\App\Service\Remote\BitrixAdminClient;
 use ModernBx\Cli\App\Service\Remote\ProjectNameGenerator;
 use ModernBx\Cli\App\Service\Remote\ProjectRegistry;
@@ -107,6 +108,9 @@ final class DefaultContainerBuilder
 
         $this->containerBuilder
             ->autowire(PackageStrategyRegistry::class, PackageStrategyRegistry::class);
+
+        $this->containerBuilder
+            ->autowire(AdminerClient::class, AdminerClient::class);
 
         $this->containerBuilder
             ->autowire(RemoteBackupPhpCodeBuilder::class, RemoteBackupPhpCodeBuilder::class);

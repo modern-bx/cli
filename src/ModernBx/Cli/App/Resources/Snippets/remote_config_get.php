@@ -58,7 +58,8 @@ try {
     foreach ($parameters as $parameter) {
         if ($parameter === 'db.engine') {
             // @phpstan-ignore-next-line Bitrix API доступен на удаленном проекте.
-            $values[] = \Bitrix\Main\Application::getConnection()->getConnectionType();
+            $connection = \Bitrix\Main\Application::getConnection();
+            $values[] = $connection->getType();
             continue;
         }
 
