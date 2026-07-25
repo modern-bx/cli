@@ -7,6 +7,9 @@ namespace ModernBx\Cli\App\Console\Command\Vendor;
 use ModernBx\Cli\App\Console\Command\BxCommand;
 use ModernBx\Cli\App\Service\Remote\BitrixAdminClient;
 use ModernBx\Cli\App\Service\Remote\RemoteProjectConfigManager;
+use ModernBx\Cli\App\Service\Vendor\InstallationPath;
+use ModernBx\Cli\App\Service\Vendor\PackageStrategy;
+use ModernBx\Cli\App\Service\Vendor\PackageStrategyRegistry;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
@@ -22,43 +25,54 @@ final class InstallCommand extends BxCommand
 
     private RemoteProjectConfigManager $remoteProjectConfigManager;
     private BitrixAdminClient $bitrixAdminClient;
+    private PackageStrategyRegistry $packageStrategyRegistry;
 
     public function __construct(
         RemoteProjectConfigManager $remoteProjectConfigManager,
-        BitrixAdminClient $bitrixAdminClient
+        BitrixAdminClient $bitrixAdminClient,
+        PackageStrategyRegistry $packageStrategyRegistry
     ) {
         parent::__construct();
         $this->remoteProjectConfigManager = $remoteProjectConfigManager;
         $this->bitrixAdminClient = $bitrixAdminClient;
+        $this->packageStrategyRegistry = $packageStrategyRegistry;
     }
 
     protected function configure(): void
     {
         $this
-            ->setDescription('Устанавливает стороннее ПО в корень сайта.')
+            ->setDescription('Устанавливает стороннее ПО в указанную папку сайта.')
             ->addOption('remote', null, InputOption::VALUE_REQUIRED, 'Кодовое имя удаленного проекта')
             ->addOption('local', null, InputOption::VALUE_NONE, 'Отключить неявный remote текущей сессии')
+            ->addOption('path', null, InputOption::VALUE_REQUIRED, 'Папка установки относительно корня сайта')
             ->addArgument('package', InputArgument::REQUIRED, 'Пакет для установки: adminer');
     }
 
     protected function executeInternal(InputInterface $input, OutputInterface $output): void
     {
         $package = $input->getArgument('package');
-        if (!is_string($package) || strtolower($package) !== 'adminer') {
-            throw new \RuntimeException('Неизвестный пакет. Доступно: adminer.', static::CODE_INVALID_ARGUMENT_VALUE);
+        if (!is_string($package)) {
+            throw new \RuntimeException('Аргумент package должен быть строкой.', static::CODE_INVALID_ARGUMENT_VALUE);
         }
+        $strategy = $this->packageStrategyRegistry->get($package);
+        $path = InstallationPath::resolveForInstall($input->getOption('path'), $strategy);
 
         $remote = $input->getOption('remote');
-        $credentials = $this->installAdminer(is_string($remote) ? $remote : null, $input, $output);
+        $credentials = $this->installAdminer(is_string($remote) ? $remote : null, $path, $strategy, $input, $output);
 
-        $this->printer->info('Adminer установлен: /' . self::ADMINER_FILENAME);
+        $this->printer->info('Adminer установлен: ' . $path . '/' . self::ADMINER_FILENAME);
         $this->printer->info('Логин: ' . $credentials['login']);
         $this->printer->info('Пароль: ' . $credentials['password']);
     }
 
     /** @return array{login: string, password: string} */
-    private function installAdminer(?string $remote, InputInterface $input, OutputInterface $output): array
-    {
+    private function installAdminer(
+        ?string $remote,
+        string $path,
+        PackageStrategy $strategy,
+        InputInterface $input,
+        OutputInterface $output
+    ): array {
         $cache = $this->cachePath(self::ADMINER_FILENAME);
         $meta = $this->head(self::ADMINER_URL);
 
@@ -75,10 +89,14 @@ final class InstallCommand extends BxCommand
 
         try {
             if ($remote !== null) {
-                $this->uploadRemote($remote, $prepared);
+                $this->uploadRemote($remote, $path, $strategy, $prepared);
             } else {
                 parent::executeInternal($input, $output);
-                $target = rtrim($this->getDocumentRoot()->toString(), '/') . '/' . self::ADMINER_FILENAME;
+                $directory = rtrim($this->getDocumentRoot()->toString(), '/') . $path;
+                if (!is_dir($directory) && !mkdir($directory, 0775, true) && !is_dir($directory)) {
+                    throw new \RuntimeException('Не удалось создать папку установки: ' . $path, static::CODE_IO_ERROR);
+                }
+                $target = $directory . '/' . $strategy->getMainFilename();
                 if (file_put_contents($target, file_get_contents($prepared)) === false) {
                     throw new \RuntimeException('Не удалось записать файл: ' . $target, static::CODE_IO_ERROR);
                 }
@@ -90,8 +108,12 @@ final class InstallCommand extends BxCommand
         return ['login' => 'admin', 'password' => $password];
     }
 
-    private function uploadRemote(string $codename, string $source): void
-    {
+    private function uploadRemote(
+        string $codename,
+        string $path,
+        PackageStrategy $strategy,
+        string $source
+    ): void {
         $config = $this->remoteProjectConfigManager->load($codename);
         $endpoint = $this->remoteProjectConfigManager->getEndpoint($config);
         $sessionId = $this->remoteProjectConfigManager->getSessionId($config);
@@ -116,28 +138,37 @@ final class InstallCommand extends BxCommand
         }
 
         try {
-            $this->finalizeRemoteInstall($endpoint, $sessionId, $temporaryFilename);
+            $this->finalizeRemoteInstall($endpoint, $sessionId, $path, $strategy, $temporaryFilename);
         } catch (\RuntimeException $err) {
             if ($err->getMessage() !== 'REMOTE_SESSION_EXPIRED') {
                 throw $err;
             }
             $sessionId = $this->remoteProjectConfigManager->refreshSession($codename, $config);
-            $this->finalizeRemoteInstall($endpoint, $sessionId, $temporaryFilename);
+            $this->finalizeRemoteInstall($endpoint, $sessionId, $path, $strategy, $temporaryFilename);
         }
     }
 
-    private function finalizeRemoteInstall(string $endpoint, string $sessionId, string $temporaryFilename): void
-    {
+    private function finalizeRemoteInstall(
+        string $endpoint,
+        string $sessionId,
+        string $path,
+        PackageStrategy $strategy,
+        string $temporaryFilename
+    ): void {
         $temporaryFilename = var_export($temporaryFilename, true);
-        $adminerFilename = var_export(self::ADMINER_FILENAME, true);
+        $targetDirectory = var_export($path, true);
+        $adminerFilename = var_export($strategy->getMainFilename(), true);
         $code = <<<PHP
 
             \$root = rtrim((string) \$_SERVER['DOCUMENT_ROOT'], '/');
             \$source = \$root . '/' . {$temporaryFilename};
-            \$target = \$root . '/' . {$adminerFilename};
+            \$directory = \$root . {$targetDirectory};
+            \$target = \$directory . '/' . {$adminerFilename};
             \$error = null;
             if (!is_file(\$source)) {
                 \$error = 'Временный файл Adminer не найден после загрузки.';
+            } elseif (!is_dir(\$directory) && !mkdir(\$directory, 0775, true) && !is_dir(\$directory)) {
+                \$error = 'Не удалось создать папку установки Adminer.';
             } elseif (!rename(\$source, \$target)) {
                 \$error = 'Не удалось заменить adminer.php временным файлом.';
             }
