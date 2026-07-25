@@ -1,0 +1,332 @@
+<?php
+
+declare(strict_types=1);
+
+namespace ModernBx\Cli\App\Console\Command\Vendor;
+
+use ModernBx\Cli\App\Console\Command\BxCommand;
+use ModernBx\Cli\App\Service\Remote\BitrixAdminClient;
+use ModernBx\Cli\App\Service\Remote\RemoteProjectConfigManager;
+use ModernBx\Cli\App\Service\Vendor\InstallationPath;
+use ModernBx\Cli\App\Service\Vendor\PackageStrategy;
+use ModernBx\Cli\App\Service\Vendor\PackageStrategyRegistry;
+use Symfony\Component\Console\Input\InputArgument;
+use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Input\InputOption;
+use Symfony\Component\Console\Output\OutputInterface;
+
+final class InstallCommand extends BxCommand
+{
+    protected static $defaultName = 'vendor:install';
+
+    private const ADMINER_URL = 'https://www.adminer.org/latest.php';
+    private const ADMINER_FILENAME = 'adminer.php';
+    private const CACHE_DIRECTORY = '.config/bx-cli/cache/vendor-install/adminer';
+
+    private RemoteProjectConfigManager $remoteProjectConfigManager;
+    private BitrixAdminClient $bitrixAdminClient;
+    private PackageStrategyRegistry $packageStrategyRegistry;
+
+    public function __construct(
+        RemoteProjectConfigManager $remoteProjectConfigManager,
+        BitrixAdminClient $bitrixAdminClient,
+        PackageStrategyRegistry $packageStrategyRegistry
+    ) {
+        parent::__construct();
+        $this->remoteProjectConfigManager = $remoteProjectConfigManager;
+        $this->bitrixAdminClient = $bitrixAdminClient;
+        $this->packageStrategyRegistry = $packageStrategyRegistry;
+    }
+
+    protected function configure(): void
+    {
+        $this
+            ->setDescription('Устанавливает стороннее ПО в указанную папку сайта.')
+            ->addOption('remote', null, InputOption::VALUE_REQUIRED, 'Кодовое имя удаленного проекта')
+            ->addOption('local', null, InputOption::VALUE_NONE, 'Отключить неявный remote текущей сессии')
+            ->addOption('path', null, InputOption::VALUE_REQUIRED, 'Папка установки относительно корня сайта')
+            ->addArgument('package', InputArgument::REQUIRED, 'Пакет для установки: adminer');
+    }
+
+    protected function executeInternal(InputInterface $input, OutputInterface $output): void
+    {
+        $package = $input->getArgument('package');
+        if (!is_string($package)) {
+            throw new \RuntimeException('Аргумент package должен быть строкой.', static::CODE_INVALID_ARGUMENT_VALUE);
+        }
+        $strategy = $this->packageStrategyRegistry->get($package);
+        $path = InstallationPath::resolveForInstall($input->getOption('path'), $strategy);
+
+        $remote = $input->getOption('remote');
+        $credentials = $this->installAdminer(is_string($remote) ? $remote : null, $path, $strategy, $input, $output);
+
+        $this->printer->info('Adminer установлен: ' . $path . '/' . self::ADMINER_FILENAME);
+        $this->printer->info('Логин: ' . $credentials['login']);
+        $this->printer->info('Пароль: ' . $credentials['password']);
+    }
+
+    /** @return array{login: string, password: string} */
+    private function installAdminer(
+        ?string $remote,
+        string $path,
+        PackageStrategy $strategy,
+        InputInterface $input,
+        OutputInterface $output
+    ): array {
+        $cache = $this->cachePath(self::ADMINER_FILENAME);
+        $meta = $this->head(self::ADMINER_URL);
+
+        if (!$this->cacheIsFresh($cache, $meta)) {
+            $this->printer->info('Скачиваю adminer: ' . self::ADMINER_URL);
+            $this->download(self::ADMINER_URL, $cache);
+            $this->writeMeta($cache, $meta);
+        } else {
+            $this->printer->info('Использую кешированный adminer: ' . $cache);
+        }
+
+        $password = $this->generatePassword();
+        $prepared = $this->prepareAdminer($cache, 'admin', $password);
+
+        try {
+            if ($remote !== null) {
+                $this->uploadRemote($remote, $path, $strategy, $prepared);
+            } else {
+                parent::executeInternal($input, $output);
+                $directory = rtrim($this->getDocumentRoot()->toString(), '/') . $path;
+                if (!is_dir($directory) && !mkdir($directory, 0775, true) && !is_dir($directory)) {
+                    throw new \RuntimeException('Не удалось создать папку установки: ' . $path, static::CODE_IO_ERROR);
+                }
+                $target = $directory . '/' . $strategy->getMainFilename();
+                if (file_put_contents($target, file_get_contents($prepared)) === false) {
+                    throw new \RuntimeException('Не удалось записать файл: ' . $target, static::CODE_IO_ERROR);
+                }
+            }
+        } finally {
+            @unlink($prepared);
+        }
+
+        return ['login' => 'admin', 'password' => $password];
+    }
+
+    private function uploadRemote(
+        string $codename,
+        string $path,
+        PackageStrategy $strategy,
+        string $source
+    ): void {
+        $config = $this->remoteProjectConfigManager->load($codename);
+        $endpoint = $this->remoteProjectConfigManager->getEndpoint($config);
+        $sessionId = $this->remoteProjectConfigManager->getSessionId($config);
+        if ($sessionId === '') {
+            $sessionId = $this->remoteProjectConfigManager->refreshSession($codename, $config);
+        }
+
+        $temporaryFilename = '.bx-cli-adminer-' . bin2hex(random_bytes(8)) . '.tmp';
+
+        try {
+            $this->bitrixAdminClient->uploadFile($endpoint, $sessionId, $source, '/', $temporaryFilename);
+        } catch (\RuntimeException $err) {
+            if ($err->getMessage() !== 'REMOTE_SESSION_EXPIRED') {
+                throw new \RuntimeException(
+                    'Не удалось загрузить временный файл Adminer: ' . $err->getMessage(),
+                    1,
+                    $err,
+                );
+            }
+            $sessionId = $this->remoteProjectConfigManager->refreshSession($codename, $config);
+            $this->bitrixAdminClient->uploadFile($endpoint, $sessionId, $source, '/', $temporaryFilename);
+        }
+
+        try {
+            $this->finalizeRemoteInstall($endpoint, $sessionId, $path, $strategy, $temporaryFilename);
+        } catch (\RuntimeException $err) {
+            if ($err->getMessage() !== 'REMOTE_SESSION_EXPIRED') {
+                throw $err;
+            }
+            $sessionId = $this->remoteProjectConfigManager->refreshSession($codename, $config);
+            $this->finalizeRemoteInstall($endpoint, $sessionId, $path, $strategy, $temporaryFilename);
+        }
+    }
+
+    private function finalizeRemoteInstall(
+        string $endpoint,
+        string $sessionId,
+        string $path,
+        PackageStrategy $strategy,
+        string $temporaryFilename
+    ): void {
+        $temporaryFilename = var_export($temporaryFilename, true);
+        $targetDirectory = var_export($path, true);
+        $adminerFilename = var_export($strategy->getMainFilename(), true);
+        $code = <<<PHP
+
+            \$root = rtrim((string) \$_SERVER['DOCUMENT_ROOT'], '/');
+            \$source = \$root . '/' . {$temporaryFilename};
+            \$directory = \$root . {$targetDirectory};
+            \$target = \$directory . '/' . {$adminerFilename};
+            \$error = null;
+            if (!is_file(\$source)) {
+                \$error = 'Временный файл Adminer не найден после загрузки.';
+            } elseif (!is_dir(\$directory) && !mkdir(\$directory, 0775, true) && !is_dir(\$directory)) {
+                \$error = 'Не удалось создать папку установки Adminer.';
+            } elseif (!rename(\$source, \$target)) {
+                \$error = 'Не удалось заменить adminer.php временным файлом.';
+            }
+            echo json_encode(['ok' => \$error === null, 'error' => \$error], JSON_UNESCAPED_UNICODE);
+            PHP;
+        $result = json_decode($this->bitrixAdminClient->executePhp($endpoint, $sessionId, $code), true);
+
+        if (!is_array($result) || ($result['ok'] ?? false) !== true) {
+            $error = is_array($result) && is_string($result['error'] ?? null)
+                ? $result['error']
+                : 'Не удалось завершить установку Adminer на удаленном проекте.';
+            throw new \RuntimeException($error, 1);
+        }
+    }
+
+    /** @param array{length: int|null, etag: string|null, last_modified: string|null} $meta */
+    private function cacheIsFresh(string $cache, array $meta): bool
+    {
+        if (!is_file($cache)) {
+            return false;
+        }
+        $stored = json_decode((string) @file_get_contents($cache . '.json'), true);
+        return is_array($stored) && $stored == $meta;
+    }
+
+    private function cachePath(string $filename): string
+    {
+        $home = getenv('HOME');
+        if (!is_string($home) || $home === '') {
+            throw new \RuntimeException('Не удалось определить домашнюю директорию для кеша.');
+        }
+        return implode(DIRECTORY_SEPARATOR, [
+            rtrim($home, DIRECTORY_SEPARATOR),
+            self::CACHE_DIRECTORY,
+            $filename,
+        ]);
+    }
+
+    /** @return array{length: int|null, etag: string|null, last_modified: string|null} */
+    private function head(string $url): array
+    {
+        $headers = @get_headers($url, true, stream_context_create([
+            'http' => ['method' => 'HEAD', 'user_agent' => 'bx-cli'],
+        ]));
+        if (!is_array($headers)) {
+            return ['length' => null, 'etag' => null, 'last_modified' => null];
+        }
+        $status = $headers[0] ?? '';
+        if (is_string($status) && preg_match('/^HTTP\/\S+\s+(\d+)/', $status, $m) && (int) $m[1] >= 400) {
+            throw new \RuntimeException(sprintf('Сервер вернул ошибку %s для %s', $m[1], $url));
+        }
+        return [
+            'length' => $this->headerInt($headers, 'Content-Length'),
+            'etag' => $this->headerString($headers, 'ETag'),
+            'last_modified' => $this->headerString($headers, 'Last-Modified'),
+        ];
+    }
+
+    /** @param array<string|int, mixed> $headers */
+    private function headerString(array $headers, string $name): ?string
+    {
+        $value = $headers[$name] ?? $headers[strtolower($name)] ?? null;
+        if (is_array($value)) {
+            $value = end($value);
+        }
+        return is_string($value) && $value !== '' ? $value : null;
+    }
+
+    /** @param array<string|int, mixed> $headers */
+    private function headerInt(array $headers, string $name): ?int
+    {
+        $value = $this->headerString($headers, $name);
+        return $value !== null && ctype_digit($value) ? (int) $value : null;
+    }
+
+    /** @param array{length: int|null, etag: string|null, last_modified: string|null} $meta */
+    private function writeMeta(string $cache, array $meta): void
+    {
+        file_put_contents($cache . '.json', json_encode($meta, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+    }
+
+    private function download(string $url, string $target): void
+    {
+        $directory = dirname($target);
+        if (!is_dir($directory) && !mkdir($directory, 0777, true) && !is_dir($directory)) {
+            throw new \RuntimeException('Не удалось создать директорию кеша: ' . $directory);
+        }
+        $content = @file_get_contents($url, false, stream_context_create(['http' => ['user_agent' => 'bx-cli']]));
+        if (!is_string($content)) {
+            throw new \RuntimeException('Не удалось скачать файл: ' . $url);
+        }
+        file_put_contents($target, $content);
+    }
+
+    private function prepareAdminer(string $source, string $login, string $password): string
+    {
+        $content = file_get_contents($source);
+        if (!is_string($content)) {
+            throw new \RuntimeException('Не удалось прочитать файл: ' . $source);
+        }
+        $snippet = file_get_contents($this->authSnippetPath());
+        if (!is_string($snippet)) {
+            throw new \RuntimeException('Не удалось прочитать сниппет авторизации.');
+        }
+        $snippet = preg_replace('/^<\?php\s*/', '', $snippet, 1);
+        if (!is_string($snippet)) {
+            throw new \RuntimeException('Не удалось подготовить сниппет авторизации.');
+        }
+        $snippet = str_replace(
+            ['__BX_CLI_ADMINER_LOGIN__', '__BX_CLI_ADMINER_PASSWORD_HASH__'],
+            [$login, password_hash($password, PASSWORD_DEFAULT)],
+            $snippet,
+        );
+        $content = $this->injectAuthSnippet($content, $snippet);
+        $target = tempnam(sys_get_temp_dir(), 'bx-cli-adminer-');
+        if (!is_string($target) || file_put_contents($target, $content) === false) {
+            throw new \RuntimeException('Не удалось подготовить временный adminer.php.');
+        }
+        return $target;
+    }
+
+    private function injectAuthSnippet(string $content, string $snippet): string
+    {
+        $offset = 0;
+        $insideNamespaceDeclaration = false;
+
+        foreach (token_get_all($content) as $token) {
+            $tokenText = is_array($token) ? $token[1] : $token;
+            $offset += strlen($tokenText);
+
+            if (is_array($token) && $token[0] === T_NAMESPACE) {
+                $insideNamespaceDeclaration = true;
+                continue;
+            }
+
+            if ($insideNamespaceDeclaration && ($tokenText === ';' || $tokenText === '{')) {
+                return substr_replace($content, "\n" . $snippet . "\n", $offset, 0);
+            }
+
+            if (is_array($token) && $token[0] === T_OPEN_TAG) {
+                $openTagOffset = $offset;
+            }
+        }
+
+        if (isset($openTagOffset)) {
+            return substr_replace($content, "\n" . $snippet . "\n", $openTagOffset, 0);
+        }
+
+        throw new \RuntimeException('Не удалось найти начало PHP-кода в adminer.php.');
+    }
+
+    private function authSnippetPath(): string
+    {
+        return dirname(__DIR__, 3) . '/Resources/Snippets/Vendor/adminer_http_auth.php';
+    }
+
+    private function generatePassword(): string
+    {
+        return rtrim(strtr(base64_encode(random_bytes(18)), '+/', '-_'), '=');
+    }
+}

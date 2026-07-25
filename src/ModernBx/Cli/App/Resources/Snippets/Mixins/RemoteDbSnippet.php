@@ -8,9 +8,10 @@ final class RemoteDbSnippet
     public static function getTables(object $connection, ?array $filter = null): array
     {
         $tables = [];
-        $result = $connection->query(self::isMysql($connection)
-            ? "SHOW FULL TABLES WHERE Table_type = 'BASE TABLE'"
-            : "SELECT tablename FROM pg_tables WHERE schemaname = 'public'"
+        $result = $connection->query(
+            self::isMysql($connection)
+                ? "SHOW FULL TABLES WHERE Table_type = 'BASE TABLE'"
+                : "SELECT tablename FROM pg_tables WHERE schemaname = 'public'"
         );
 
         while ($row = $result->fetch()) {
