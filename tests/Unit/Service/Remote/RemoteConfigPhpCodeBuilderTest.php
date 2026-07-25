@@ -15,7 +15,9 @@ final class RemoteConfigPhpCodeBuilderTest extends TestCase
 
         self::assertStringContainsString("0 => 'db.password'", $code);
         self::assertStringContainsString("1 => 'db.engine'", $code);
-        self::assertStringContainsString('getConnectionType()', $code);
+        self::assertStringContainsString('Application::getConnection()', $code);
+        self::assertStringContainsString('$connection->getType()', $code);
+        self::assertStringNotContainsString('getConnectionType()', $code);
         self::assertStringContainsString(".settings_extra.php", $code);
         self::assertStringContainsString(".settings.php", $code);
         self::assertStringContainsString("php_interface/dbconn.php", $code);
@@ -80,7 +82,7 @@ final class RemoteConfigPhpCodeBuilderTest extends TestCase
             namespace Bitrix\Main;
             final class TestConnection
             {
-                public function getConnectionType(): string
+                public function getType(): string
                 {
                     return 'oracle';
                 }
