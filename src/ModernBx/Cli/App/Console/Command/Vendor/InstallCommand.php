@@ -19,7 +19,6 @@ final class InstallCommand extends BxCommand
     private const ADMINER_URL = 'https://www.adminer.org/latest.php';
     private const ADMINER_FILENAME = 'adminer.php';
     private const CACHE_DIRECTORY = '.config/bx-cli/cache/vendor-install/adminer';
-    private const AUTH_SNIPPET = __DIR__ . '/../../../../Resources/Snippets/Vendor/adminer_http_auth.php';
 
     private RemoteProjectConfigManager $remoteProjectConfigManager;
     private BitrixAdminClient $bitrixAdminClient;
@@ -202,7 +201,7 @@ final class InstallCommand extends BxCommand
         if (!is_string($content)) {
             throw new \RuntimeException('Не удалось прочитать файл: ' . $source);
         }
-        $snippet = file_get_contents(self::AUTH_SNIPPET);
+        $snippet = file_get_contents($this->authSnippetPath());
         if (!is_string($snippet)) {
             throw new \RuntimeException('Не удалось прочитать сниппет авторизации.');
         }
@@ -224,6 +223,11 @@ final class InstallCommand extends BxCommand
             throw new \RuntimeException('Не удалось подготовить временный adminer.php.');
         }
         return $target;
+    }
+
+    private function authSnippetPath(): string
+    {
+        return dirname(__DIR__, 3) . '/Resources/Snippets/Vendor/adminer_http_auth.php';
     }
 
     private function generatePassword(): string
