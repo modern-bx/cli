@@ -19,6 +19,10 @@ final class RemoteConfigPhpCodeBuilderTest extends TestCase
         self::assertStringContainsString(".settings_extra.php", $code);
         self::assertStringContainsString(".settings.php", $code);
         self::assertStringContainsString("php_interface/dbconn.php", $code);
+        self::assertStringNotContainsString('DB_HOST', $code);
+        self::assertStringNotContainsString('DB_USERNAME', $code);
+        self::assertStringNotContainsString('DB_PASSWORD', $code);
+        self::assertStringNotContainsString('DB_NAME', $code);
     }
 
     /** @runInSeparateProcess */
@@ -100,5 +104,36 @@ final class RemoteConfigPhpCodeBuilderTest extends TestCase
 
         self::assertIsArray($result);
         self::assertSame(['oracle'], $result['result'] ?? null);
+    }
+
+    /** @runInSeparateProcess */
+    public function testReadsOnlyCanonicalLegacyConstants(): void
+    {
+        // phpcs:disable Generic.NamingConventions.UpperCaseConstantName.ConstantNotUpperCase
+        define('DBHost', 'canonical-host');
+        define('DBLogin', 'canonical-user');
+        define('DBPassword', 'canonical-pass');
+        define('DBName', 'canonical-database');
+        // phpcs:enable Generic.NamingConventions.UpperCaseConstantName.ConstantNotUpperCase
+        define('DB_HOST', 'noncanonical-host');
+        $_SERVER['DOCUMENT_ROOT'] = sys_get_temp_dir() . '/missing-bitrix-root';
+        $code = (new RemoteConfigPhpCodeBuilder())->build([
+            'db.host',
+            'db.username',
+            'db.password',
+            'db.database',
+        ]);
+
+        ob_start();
+        // phpcs:ignore Generic.PHP.ForbiddenFunctions.Found -- выполняем сгенерированный remote-сниппет в тесте.
+        eval($code);
+        $output = ob_get_clean();
+        $result = json_decode(is_string($output) ? $output : '', true);
+
+        self::assertIsArray($result);
+        self::assertSame(
+            ['canonical-host', 'canonical-user', 'canonical-pass', 'canonical-database'],
+            $result['result'] ?? null,
+        );
     }
 }

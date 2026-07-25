@@ -42,10 +42,10 @@ try {
     }
 
     $constantNames = [
-        'host' => ['DBHost', 'DB_HOST'],
-        'username' => ['DBLogin', 'DB_LOGIN', 'DBUsername', 'DB_USERNAME'],
-        'password' => ['DBPassword', 'DB_PASSWORD'],
-        'database' => ['DBName', 'DB_NAME'],
+        'host' => ['DBHost'],
+        'username' => ['DBLogin'],
+        'password' => ['DBPassword'],
+        'database' => ['DBName'],
     ];
     $settingNames = [
         'host' => ['host'],
