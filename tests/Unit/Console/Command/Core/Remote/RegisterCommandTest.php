@@ -81,6 +81,68 @@ final class RegisterCommandTest extends TestCase
         self::assertSame('project', $config['data']['project']['options']['db.database'] ?? null);
     }
 
+    public function testUpdateUsesSavedAccessAndRefreshesProjectOptionsWithoutPrompts(): void
+    {
+        $registry = new \ModernBx\Cli\App\Service\Remote\ProjectRegistry();
+        $registry->save('production', [
+            'data' => [
+                'project' => [
+                    'name' => 'production',
+                    'endpoint' => 'https://example.com',
+                    'options' => ['db.host' => 'old-host'],
+                    'accounts' => [
+                        'default' => [
+                            'login' => 'saved-admin',
+                            'password' => 'saved-secret',
+                            'cookies' => [
+                                'PHPSESSID' => ['value' => 'saved-session', 'expires' => '2030-01-01T00:00:00+00:00'],
+                            ],
+                        ],
+                    ],
+                ],
+            ],
+        ]);
+        $command = new class(new ProjectNameGenerator()) extends RegisterCommand {
+            protected function login(string $endpoint, string $login, string $password): array
+            {
+                throw new \RuntimeException('Interactive login must not be used by --update.');
+            }
+
+            protected function loadRemoteOptions(string $endpoint, string $sessionId): array
+            {
+                return [
+                    'db.engine' => 'mysql',
+                    'db.host' => 'new-host',
+                    'db.username' => 'project',
+                    'db.password' => 'db-secret',
+                    'db.database' => 'project',
+                ];
+            }
+        };
+        $command->setName('remote:register');
+        $application = new Application();
+        $application->add($command);
+        $tester = new CommandTester($command);
+
+        $exitCode = $tester->execute(['endpoint' => 'production', '--update' => true]);
+
+        self::assertSame(AppCommand::CODE_SUCCESS, $exitCode, $tester->getDisplay());
+        self::assertStringNotContainsString('Логин администра', $tester->getDisplay());
+        $config = $registry->load('production');
+        $data = $config['data'] ?? null;
+        self::assertIsArray($data);
+        $project = $data['project'] ?? null;
+        self::assertIsArray($project);
+        $options = $project['options'] ?? null;
+        self::assertIsArray($options);
+        $accounts = $project['accounts'] ?? null;
+        self::assertIsArray($accounts);
+        $account = $accounts['default'] ?? null;
+        self::assertIsArray($account);
+        self::assertSame('new-host', $options['db.host'] ?? null);
+        self::assertSame('saved-admin', $account['login'] ?? null);
+    }
+
     private function removeDirectory(string $directory): void
     {
         if (!is_dir($directory)) {

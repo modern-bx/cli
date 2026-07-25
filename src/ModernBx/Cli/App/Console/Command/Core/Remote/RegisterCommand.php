@@ -6,12 +6,15 @@ namespace ModernBx\Cli\App\Console\Command\Core\Remote;
 
 use ModernBx\Cli\App\Console\Command\AppCommand;
 use ModernBx\Cli\App\Service\Remote\ProjectNameGenerator;
+use ModernBx\Cli\App\Service\Remote\ProjectRegistry;
 use ModernBx\Cli\App\Service\Remote\BitrixAdminClient;
 use ModernBx\Cli\App\Service\Remote\RemoteConfigParameters;
 use ModernBx\Cli\App\Service\Remote\RemoteConfigPhpCodeBuilder;
+use ModernBx\Cli\App\Service\Remote\RemoteProjectConfigManager;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputDefinition;
 use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Helper\QuestionHelper;
 use Symfony\Component\Console\Question\Question;
@@ -25,16 +28,23 @@ class RegisterCommand extends AppCommand
     protected ProjectNameGenerator $projectNameGenerator;
     private BitrixAdminClient $bitrixAdminClient;
     private RemoteConfigPhpCodeBuilder $remoteConfigPhpCodeBuilder;
+    private ProjectRegistry $projectRegistry;
+    private RemoteProjectConfigManager $remoteProjectConfigManager;
 
     public function __construct(
         ProjectNameGenerator $projectNameGenerator,
         ?TranslatorInterface $translator = null,
         ?BitrixAdminClient $bitrixAdminClient = null,
-        ?RemoteConfigPhpCodeBuilder $remoteConfigPhpCodeBuilder = null
+        ?RemoteConfigPhpCodeBuilder $remoteConfigPhpCodeBuilder = null,
+        ?ProjectRegistry $projectRegistry = null,
+        ?RemoteProjectConfigManager $remoteProjectConfigManager = null
     ) {
         $this->projectNameGenerator = $projectNameGenerator;
         $this->bitrixAdminClient = $bitrixAdminClient ?? new BitrixAdminClient();
         $this->remoteConfigPhpCodeBuilder = $remoteConfigPhpCodeBuilder ?? new RemoteConfigPhpCodeBuilder();
+        $this->projectRegistry = $projectRegistry ?? new ProjectRegistry();
+        $this->remoteProjectConfigManager = $remoteProjectConfigManager
+            ?? new RemoteProjectConfigManager($this->projectRegistry, $this->bitrixAdminClient);
 
         parent::__construct($translator);
     }
@@ -51,13 +61,19 @@ class RegisterCommand extends AppCommand
                 new InputDefinition([
                     new InputArgument(
                         'endpoint',
-                        InputArgument::REQUIRED,
-                        'Endpoint проекта в формате http(s)://host.tld[:port]',
+                        InputArgument::OPTIONAL,
+                        'Endpoint проекта или кодовое имя проекта для --update',
                     ),
                     new InputArgument(
                         'codename',
                         InputArgument::OPTIONAL,
                         'Кодовое имя проекта',
+                    ),
+                    new InputOption(
+                        'update',
+                        null,
+                        InputOption::VALUE_NONE,
+                        'Обновить параметры уже зарегистрированного проекта',
                     ),
                 ]),
             );
@@ -67,8 +83,15 @@ class RegisterCommand extends AppCommand
     {
         parent::executeInternal($input, $output);
 
-        /** @var string $endpoint */
+        if ($input->getOption('update')) {
+            $this->updateProject($input);
+            return;
+        }
+
         $endpoint = $input->getArgument('endpoint');
+        if (!is_string($endpoint) || $endpoint === '') {
+            throw new \RuntimeException('Endpoint проекта обязателен.', static::CODE_INVALID_ARGUMENT_VALUE);
+        }
         $endpoint = $this->normalizeEndpoint($endpoint);
         $projectsDir = $this->getProjectsDir();
         $projectName = $this->resolveProjectName($input, $projectsDir, $endpoint);
@@ -112,6 +135,49 @@ class RegisterCommand extends AppCommand
         );
 
         $this->printer->info(sprintf('Проект зарегистрирован: %s', $projectName));
+    }
+
+    private function updateProject(InputInterface $input): void
+    {
+        $codename = $input->getArgument('codename');
+        if (!is_string($codename) || trim($codename) === '') {
+            $codename = $input->getArgument('endpoint');
+        }
+        if (!is_string($codename) || !$this->projectRegistry->isValidCodename(trim($codename))) {
+            throw new \RuntimeException(
+                'Для --update необходимо указать кодовое имя проекта.',
+                static::CODE_INVALID_ARGUMENT_VALUE,
+            );
+        }
+        $codename = trim($codename);
+        $config = $this->remoteProjectConfigManager->load($codename);
+        $endpoint = $this->remoteProjectConfigManager->getEndpoint($config);
+        $sessionId = $this->remoteProjectConfigManager->getSessionId($config);
+        if ($sessionId === '') {
+            $sessionId = $this->remoteProjectConfigManager->refreshSession($codename, $config);
+        }
+
+        $this->printer->info('Получаю параметры конфигурации удаленного проекта.');
+        try {
+            $options = $this->loadRemoteOptions($endpoint, $sessionId);
+        } catch (\RuntimeException $error) {
+            if ($error->getMessage() !== 'REMOTE_SESSION_EXPIRED') {
+                throw $error;
+            }
+            $sessionId = $this->remoteProjectConfigManager->refreshSession($codename, $config);
+            $options = $this->loadRemoteOptions($endpoint, $sessionId);
+        }
+
+        $data = $config['data'] ?? [];
+        $data = is_array($data) ? $data : [];
+        $project = $data['project'] ?? [];
+        $project = is_array($project) ? $project : [];
+        $project['options'] = $options;
+        $data['project'] = $project;
+        $config['data'] = $data;
+        $this->projectRegistry->save($codename, $config);
+
+        $this->printer->info(sprintf('Параметры проекта обновлены: %s', $codename));
     }
 
     protected function normalizeEndpoint(string $endpoint): string

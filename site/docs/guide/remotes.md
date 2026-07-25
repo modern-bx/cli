@@ -18,6 +18,14 @@ php cli.phar remote:register https://example.org prod
 
 Команда нормализует endpoint, авторизуется в `/bitrix/admin/`, сохраняет имя проекта, endpoint, учётные данные, PHPSESSID и параметры базы данных. Параметры `db.engine`, `db.host`, `db.username`, `db.password` и `db.database` автоматически читаются из ядра Bitrix и записываются в `project.yaml`. Если кодовое имя не передано, по умолчанию используется host endpoint.
 
+Обновить параметры уже зарегистрированного проекта можно без повторного ввода доступов:
+
+```bash
+php cli.phar remote:register --update prod
+```
+
+Команда использует endpoint, учётные данные и сессию из сохранённого `project.yaml`, заново запрашивает параметры у remote и заменяет секцию `options`.
+
 ## Выбор remote для сессии
 
 ```bash
