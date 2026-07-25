@@ -76,6 +76,10 @@ class ApplyCommand extends DbCommand
             throw new \Exception($this->trans('error.db_apply.file_string'), static::CODE_INVALID_ARGUMENT_VALUE);
         }
 
+        if ($file !== null) {
+            $file = (string) $file;
+        }
+
         $sql = $this->readSql($file);
 
         if (trim($sql) === '') {
@@ -109,21 +113,106 @@ class ApplyCommand extends DbCommand
         $this->decodeRemoteJsonResult($json, 'Не удалось применить SQL-файл на удаленном проекте.');
     }
 
-    protected function readSql(mixed $file): string
+    protected function readSql(?string $file): string
     {
         if ($file === null) {
             return (string) stream_get_contents(STDIN);
         }
 
-        if (!is_file($file) || !is_readable($file)) {
-            throw new \Exception('SQL file is not readable: ' . $file);
+        $paths = $this->resolveSqlPaths($file);
+        $parts = [];
+
+        foreach ($paths as $path) {
+            if ($this->isZipPath($path)) {
+                array_push($parts, ...$this->readZipSql($path));
+                continue;
+            }
+
+            $sql = file_get_contents($path);
+
+            if ($sql === false) {
+                throw new \Exception('Unable to read SQL file: ' . $path);
+            }
+
+            $parts[] = $sql;
         }
 
-        $sql = file_get_contents($file);
+        return implode("\n", $parts);
+    }
 
-        if ($sql === false) {
-            throw new \Exception('Unable to read SQL file: ' . $file);
+    /** @return array<int, string> */
+    protected function resolveSqlPaths(string $expression): array
+    {
+        if (is_dir($expression)) {
+            $paths = glob(rtrim($expression, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . '*') ?: [];
+        } elseif (is_file($expression)) {
+            $paths = [$expression];
+        } else {
+            $paths = glob($expression, GLOB_BRACE) ?: [];
         }
+
+        $paths = array_values(array_filter(
+            $paths,
+            fn (string $path): bool => is_file($path)
+                && is_readable($path)
+                && (preg_match('/\.sql$/i', $path) === 1 || $this->isZipPath($path)),
+        ));
+        sort($paths, SORT_STRING);
+
+        if ($paths === []) {
+            throw new \Exception('No readable SQL files or ZIP archives found: ' . $expression);
+        }
+
+        return $paths;
+    }
+
+    protected function isZipPath(string $path): bool
+    {
+        return preg_match('/\.zip$/i', $path) === 1;
+    }
+
+    /** @return array<int, string> */
+    protected function readZipSql(string $path): array
+    {
+        if (!class_exists('ZipArchive')) {
+            throw new \RuntimeException('PHP extension ZipArchive is not available.', static::CODE_IO_ERROR);
+        }
+
+        $zip = new \ZipArchive();
+
+        if ($zip->open($path) !== true) {
+            throw new \Exception('Unable to open ZIP archive: ' . $path);
+        }
+
+        $entries = [];
+
+        for ($index = 0; $index < $zip->numFiles; $index++) {
+            $name = $zip->getNameIndex($index);
+
+            if (!is_string($name) || str_contains(str_replace('\\', '/', $name), '/')) {
+                continue;
+            }
+
+            if (preg_match('/\.sql$/i', $name) === 1) {
+                $entries[$name] = $index;
+            }
+        }
+
+        ksort($entries, SORT_STRING);
+        $sql = [];
+
+        foreach ($entries as $name => $index) {
+            $contents = $zip->getFromIndex($index);
+
+            if ($contents === false) {
+                $zip->close();
+                throw new \Exception('Unable to extract SQL file from ZIP archive: ' . $name);
+            }
+
+            $sql[] = $contents;
+        }
+
+        $zip->close();
 
         return $sql;
     }
