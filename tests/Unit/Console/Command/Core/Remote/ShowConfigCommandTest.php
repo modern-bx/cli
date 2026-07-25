@@ -59,6 +59,13 @@ final class ShowConfigCommandTest extends TestCase
         self::assertSame("endpoint: https://example.com/bitrix/admin/\nlogin: admin\n", $tester->getDisplay());
     }
 
+    public function testCommandIsNamedRemoteShow(): void
+    {
+        $command = new ShowConfigCommand(new ProjectRegistry());
+
+        self::assertSame('remote:show', $command->getName());
+    }
+
     public function testPrintsJsonConfig(): void
     {
         $command = new ShowConfigCommand(new ProjectRegistry());

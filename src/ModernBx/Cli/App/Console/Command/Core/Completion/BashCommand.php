@@ -115,8 +115,12 @@ _bx_cli()
     fi
 
     case "${COMP_WORDS[1]}" in
-        session:remote|remote:delete|remote:rename|remote:show-config)
+        session:remote|remote:delete|remote:rename|remote:show)
             mapfile -t COMPREPLY < <(compgen -W "$(_bx_cli_remotes)" -- "$cur")
+            return 0
+            ;;
+        remote:config-get)
+            mapfile -t COMPREPLY < <(compgen -W "db.engine db.host db.username db.password db.database" -- "$cur")
             return 0
             ;;
     esac

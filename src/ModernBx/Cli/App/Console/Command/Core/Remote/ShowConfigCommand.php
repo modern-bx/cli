@@ -18,7 +18,7 @@ use function ModernBx\CommonFunctions\to_json;
 
 class ShowConfigCommand extends AppCommand
 {
-    protected static $defaultName = 'remote:show-config';
+    protected static $defaultName = 'remote:show';
 
     protected ProjectRegistry $projectRegistry;
 
