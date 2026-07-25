@@ -5,6 +5,10 @@ declare(strict_types=1);
 namespace ModernBx\Cli\Tests\Unit\Console\Command\Adminer;
 
 use ModernBx\Cli\App\Console\Command\Adminer\ImportCommand;
+use ModernBx\Cli\App\Service\Remote\BitrixAdminClient;
+use ModernBx\Cli\App\Service\Remote\ProjectRegistry;
+use ModernBx\Cli\App\Service\Remote\RemoteProjectConfigManager;
+use ModernBx\Cli\App\Service\Vendor\AdminerClient;
 use PHPUnit\Framework\TestCase;
 use ReflectionClass;
 use Symfony\Component\Console\Input\InputInterface;
@@ -22,11 +26,6 @@ final class ImportCommandTest extends TestCase
             $options = [
                 'remote' => 'production',
                 'password' => 'basic-secret',
-                'db-engine' => 'mysql',
-                'database' => 'project',
-                'db-host' => 'mysql',
-                'db-user' => 'project',
-                'db-password' => 'db-secret',
                 'path' => '/',
                 'format' => 'table',
             ];
@@ -49,6 +48,52 @@ final class ImportCommandTest extends TestCase
     public function testNormalizesAdminerDirectory(): void
     {
         self::assertSame('/tools/adminer', $this->invoke('normalizePath', ['tools/adminer/']));
+    }
+
+    public function testDatabaseOptionsUseSavedValuesAndCommandOverrides(): void
+    {
+        $saved = [
+            'db.engine' => 'mysql',
+            'db.host' => 'saved-host',
+            'db.username' => 'saved-user',
+            'db.password' => 'saved-password',
+            'db.database' => 'saved-database',
+        ];
+        $input = $this->createMock(InputInterface::class);
+        $input->method('getOption')->willReturnCallback(
+            static fn (string $name): mixed => $name === 'db.host' ? 'override-host' : null,
+        );
+
+        $result = $this->invoke('resolveDatabaseOptions', [$input, $saved]);
+
+        self::assertIsArray($result);
+        self::assertSame('override-host', $result['db.host'] ?? null);
+        self::assertSame('saved-user', $result['db.username'] ?? null);
+    }
+
+    public function testDatabaseOptionsReportMissingParameter(): void
+    {
+        $input = $this->createMock(InputInterface::class);
+        $input->method('getOption')->willReturn(null);
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Не хватает параметра --db.engine');
+
+        $this->invoke('resolveDatabaseOptions', [$input, []]);
+    }
+
+    public function testDefinesCanonicalDatabaseAndDumpLifecycleOptions(): void
+    {
+        $bitrixClient = new BitrixAdminClient();
+        $command = new ImportCommand(
+            new RemoteProjectConfigManager(new ProjectRegistry(), $bitrixClient),
+            $bitrixClient,
+            new AdminerClient(),
+        );
+
+        foreach (['db.engine', 'db.host', 'db.username', 'db.password', 'db.database', 'force', 'no-delete'] as $name) {
+            self::assertTrue($command->getDefinition()->hasOption($name));
+        }
     }
 
     /** @param mixed[] $arguments */

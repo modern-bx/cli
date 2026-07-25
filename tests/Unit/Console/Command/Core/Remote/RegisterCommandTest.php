@@ -50,6 +50,17 @@ final class RegisterCommandTest extends TestCase
             {
                 return ['value' => 'session-id', 'expires' => '2026-07-22T00:00:00+00:00'];
             }
+
+            protected function loadRemoteOptions(string $endpoint, string $sessionId): array
+            {
+                return [
+                    'db.engine' => 'mysql',
+                    'db.host' => 'mysql',
+                    'db.username' => 'project',
+                    'db.password' => 'secret',
+                    'db.database' => 'project',
+                ];
+            }
         };
         $command->setName('remote:register');
         $application = new Application();
@@ -66,6 +77,8 @@ final class RegisterCommandTest extends TestCase
         self::assertIsArray($config);
         self::assertSame('example.com', $config['data']['project']['name'] ?? null);
         self::assertSame('https://example.com:8443', $config['data']['project']['endpoint'] ?? null);
+        self::assertSame('mysql', $config['data']['project']['options']['db.engine'] ?? null);
+        self::assertSame('project', $config['data']['project']['options']['db.database'] ?? null);
     }
 
     private function removeDirectory(string $directory): void

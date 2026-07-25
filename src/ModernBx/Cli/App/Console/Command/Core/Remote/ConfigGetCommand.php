@@ -7,6 +7,7 @@ namespace ModernBx\Cli\App\Console\Command\Core\Remote;
 use ModernBx\Cli\App\Console\Command\AppCommand;
 use ModernBx\Cli\App\Service\Remote\BitrixAdminClient;
 use ModernBx\Cli\App\Service\Remote\RemoteConfigPhpCodeBuilder;
+use ModernBx\Cli\App\Service\Remote\RemoteConfigParameters;
 use ModernBx\Cli\App\Service\Remote\RemotePhpTrait;
 use ModernBx\Cli\App\Service\Remote\RemoteProjectConfigManager;
 use Symfony\Component\Console\Input\InputArgument;
@@ -18,14 +19,6 @@ final class ConfigGetCommand extends AppCommand
     use RemotePhpTrait;
 
     protected static $defaultName = 'remote:config-get';
-
-    private const SUPPORTED_PARAMETERS = [
-        'db.engine',
-        'db.host',
-        'db.username',
-        'db.password',
-        'db.database',
-    ];
 
     private RemoteConfigPhpCodeBuilder $remoteConfigPhpCodeBuilder;
 
@@ -47,7 +40,7 @@ final class ConfigGetCommand extends AppCommand
             ->addArgument(
                 'parameter',
                 InputArgument::REQUIRED,
-                'Параметр или список через запятую: ' . implode(', ', self::SUPPORTED_PARAMETERS),
+                'Параметр или список через запятую: ' . implode(', ', RemoteConfigParameters::ALL),
             );
     }
 
@@ -92,8 +85,8 @@ final class ConfigGetCommand extends AppCommand
         }
 
         foreach ($parameters as $parameter) {
-            if (!in_array($parameter, self::SUPPORTED_PARAMETERS, true)) {
-                $available = implode(', ', self::SUPPORTED_PARAMETERS);
+            if (!in_array($parameter, RemoteConfigParameters::ALL, true)) {
+                $available = implode(', ', RemoteConfigParameters::ALL);
                 throw new \RuntimeException(
                     'Неизвестный параметр: ' . $parameter . '. Доступно: ' . $available,
                     static::CODE_INVALID_ARGUMENT_VALUE,

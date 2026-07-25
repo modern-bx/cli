@@ -7,6 +7,7 @@ namespace ModernBx\Cli\App\Console\Command\Adminer;
 use ModernBx\Cli\App\Console\Command\AppCommand;
 use ModernBx\Cli\App\Service\Remote\BitrixAdminClient;
 use ModernBx\Cli\App\Service\Remote\RemoteProjectConfigManager;
+use ModernBx\Cli\App\Service\Remote\RemoteConfigParameters;
 use ModernBx\Cli\App\Service\Vendor\AdminerClient;
 use Symfony\Component\Console\Helper\Table;
 use Symfony\Component\Console\Input\InputArgument;
@@ -40,13 +41,15 @@ final class ImportCommand extends AppCommand
             ->addArgument('src', InputArgument::REQUIRED, 'Локальный SQL-дамп (.sql или .gz)')
             ->addOption('remote', null, InputOption::VALUE_REQUIRED, 'Кодовое имя удаленного проекта')
             ->addOption('password', null, InputOption::VALUE_REQUIRED, 'Пароль HTTP Basic Auth для Adminer')
-            ->addOption('db-engine', null, InputOption::VALUE_REQUIRED, 'Движок БД: mysql или pgsql')
-            ->addOption('database', null, InputOption::VALUE_REQUIRED, 'Имя базы данных')
-            ->addOption('db-host', null, InputOption::VALUE_REQUIRED, 'Хост базы данных')
-            ->addOption('db-user', null, InputOption::VALUE_REQUIRED, 'Имя пользователя БД')
-            ->addOption('db-password', null, InputOption::VALUE_REQUIRED, 'Пароль пользователя БД')
+            ->addOption('db.engine', null, InputOption::VALUE_REQUIRED, 'Движок БД: mysql или pgsql')
+            ->addOption('db.database', null, InputOption::VALUE_REQUIRED, 'Имя базы данных')
+            ->addOption('db.host', null, InputOption::VALUE_REQUIRED, 'Хост базы данных')
+            ->addOption('db.username', null, InputOption::VALUE_REQUIRED, 'Имя пользователя БД')
+            ->addOption('db.password', null, InputOption::VALUE_REQUIRED, 'Пароль пользователя БД')
             ->addOption('path', null, InputOption::VALUE_REQUIRED, 'Папка Adminer относительно корня сайта', '/')
             ->addOption('void', null, InputOption::VALUE_NONE, 'Не выводить таблицу результата')
+            ->addOption('force', null, InputOption::VALUE_NONE, 'Перезаписать уже загруженный файл дампа')
+            ->addOption('no-delete', null, InputOption::VALUE_NONE, 'Не удалять файл дампа после импорта')
             ->addOption('format', null, InputOption::VALUE_REQUIRED, 'Формат вывода: table, csv или json', 'table');
     }
 
@@ -55,13 +58,26 @@ final class ImportCommand extends AppCommand
         $options = $this->validateInput($input);
         $this->debug('Этап 1/6: загружаю конфигурацию remote "' . $options['remote'] . '".');
         $config = $this->remoteProjectConfigManager->load($options['remote']);
+        $databaseOptions = $this->resolveDatabaseOptions(
+            $input,
+            $this->remoteProjectConfigManager->getOptions($config),
+        );
         $endpoint = $this->remoteProjectConfigManager->getEndpoint($config);
         $sessionId = $this->getSessionId($options['remote'], $config);
 
         $this->debug('Этап 2/6: проверяю Adminer и отсутствие файла дампа.');
         $paths = $this->remotePaths($options['path'], $options['dump_filename']);
-        $this->assertRemoteFiles($options['remote'], $config, $endpoint, $sessionId, $paths);
+        $dumpExists = $this->assertRemoteFiles($options['remote'], $config, $endpoint, $sessionId, $paths);
         $sessionId = $this->remoteProjectConfigManager->getSessionId($config) ?: $sessionId;
+
+        if ($dumpExists && !$input->getOption('force')) {
+            throw new \RuntimeException('Файл дампа уже существует на remote: ' . $paths['dump'] . '.', 1);
+        }
+        if ($dumpExists && $input->getOption('force')) {
+            $this->debug('Опция --force: удаляю предыдущий файл дампа.');
+            $this->deleteDump($options['remote'], $config, $endpoint, $sessionId, $paths['dump']);
+            $sessionId = $this->remoteProjectConfigManager->getSessionId($config) ?: $sessionId;
+        }
 
         $this->debug('Этап 3/6: загружаю дамп как ' . $paths['dump'] . '.');
         $this->uploadDump(
@@ -75,19 +91,26 @@ final class ImportCommand extends AppCommand
         );
 
         $this->debug('Этап 4/6: начинаю HTTP-сессию Adminer.');
-        $result = $this->adminerClient->import(
-            $endpoint,
-            $paths['adminer'],
-            $options['password'],
-            $options['db_engine'],
-            $options['database'],
-            $options['db_host'],
-            $options['db_user'],
-            $options['db_password'],
-            function (string $message): void {
-                $this->debug($message);
-            },
-        );
+        try {
+            $result = $this->adminerClient->import(
+                $endpoint,
+                $paths['adminer'],
+                $options['password'],
+                $databaseOptions['db.engine'],
+                $databaseOptions['db.database'],
+                $databaseOptions['db.host'],
+                $databaseOptions['db.username'],
+                $databaseOptions['db.password'],
+                function (string $message): void {
+                    $this->debug($message);
+                },
+            );
+        } finally {
+            if (!$input->getOption('no-delete')) {
+                $this->debug('Удаляю файл дампа с remote.');
+                $this->deleteDump($options['remote'], $config, $endpoint, $sessionId, $paths['dump']);
+            }
+        }
 
         $this->debug('Этап 6/6: импорт завершен, обрабатываю результат.');
         if (!$input->getOption('void')) {
@@ -96,8 +119,8 @@ final class ImportCommand extends AppCommand
     }
 
     /**
-     * @return array{remote: string, src: string, password: string, db_engine: string, database: string,
-     *     db_host: string, db_user: string, db_password: string, path: string, format: string, dump_filename: string}
+     * @return array{remote: string, src: string, password: string, path: string, format: string,
+     *     dump_filename: string}
      */
     private function validateInput(InputInterface $input): array
     {
@@ -126,19 +149,9 @@ final class ImportCommand extends AppCommand
                 static::CODE_INVALID_ARGUMENT_VALUE,
             );
         }
-        $values = [];
-        foreach (['password', 'db-engine', 'database', 'db-host', 'db-user', 'db-password'] as $name) {
-            $value = $input->getOption($name);
-            if (!is_string($value) || $value === '') {
-                throw new \RuntimeException('Опция --' . $name . ' обязательна.', static::CODE_INVALID_OPTION_VALUE);
-            }
-            $values[str_replace('-', '_', $name)] = $value;
-        }
-        if (!in_array($values['db_engine'], ['mysql', 'pgsql'], true)) {
-            throw new \RuntimeException(
-                'Опция --db-engine поддерживает только mysql или pgsql.',
-                static::CODE_INVALID_OPTION_VALUE,
-            );
+        $password = $input->getOption('password');
+        if (!is_string($password) || $password === '') {
+            throw new \RuntimeException('Опция --password обязательна.', static::CODE_INVALID_OPTION_VALUE);
         }
         $format = $input->getOption('format');
         if (!is_string($format) || !in_array($format, ['table', 'csv', 'json'], true)) {
@@ -156,12 +169,7 @@ final class ImportCommand extends AppCommand
         return [
             'remote' => $remote,
             'src' => $src,
-            'password' => $values['password'],
-            'db_engine' => $values['db_engine'],
-            'database' => $values['database'],
-            'db_host' => $values['db_host'],
-            'db_user' => $values['db_user'],
-            'db_password' => $values['db_password'],
+            'password' => $password,
             'path' => $path,
             'format' => $format,
             'dump_filename' => $dumpFilename,
@@ -178,6 +186,40 @@ final class ImportCommand extends AppCommand
             );
         }
         return $path === '/' ? '/' : rtrim($path, '/');
+    }
+
+    /**
+     * @param array<string, string> $savedOptions
+     * @return array<string, string>
+     */
+    private function resolveDatabaseOptions(InputInterface $input, array $savedOptions): array
+    {
+        $resolved = [];
+        foreach (RemoteConfigParameters::ALL as $name) {
+            $override = $input->getOption($name);
+            if ($override !== null && !is_string($override)) {
+                throw new \RuntimeException(
+                    'Опция --' . $name . ' должна быть строкой.',
+                    static::CODE_INVALID_OPTION_VALUE,
+                );
+            }
+            $value = is_string($override) && $override !== '' ? $override : ($savedOptions[$name] ?? '');
+            if ($value === '') {
+                throw new \RuntimeException(
+                    'Не хватает параметра --' . $name
+                    . ': укажите его в команде или перерегистрируйте remote.',
+                    static::CODE_INVALID_OPTION_VALUE,
+                );
+            }
+            $resolved[$name] = $value;
+        }
+        if (!in_array($resolved['db.engine'], ['mysql', 'pgsql'], true)) {
+            throw new \RuntimeException(
+                'Опция --db.engine поддерживает только mysql или pgsql.',
+                static::CODE_INVALID_OPTION_VALUE,
+            );
+        }
+        return $resolved;
     }
 
     /** @return array{adminer: string, dump: string} */
@@ -204,7 +246,7 @@ final class ImportCommand extends AppCommand
         string $endpoint,
         string $sessionId,
         array $paths
-    ): void {
+    ): bool {
         $code = '$root = rtrim((string) $_SERVER[\'DOCUMENT_ROOT\'], \'/\');'
             . ' echo json_encode([\'adminer\' => is_file($root . ' . var_export($paths['adminer'], true) . '),'
             . ' \'dump\' => is_file($root . ' . var_export($paths['dump'], true) . ')]);';
@@ -213,12 +255,7 @@ final class ImportCommand extends AppCommand
         if (!is_array($files) || ($files['adminer'] ?? false) !== true) {
             throw new \RuntimeException('Adminer не найден на remote: ' . $paths['adminer'] . '.', 1);
         }
-        if (($files['dump'] ?? false) === true) {
-            throw new \RuntimeException(
-                'Файл дампа уже существует на remote: ' . $paths['dump'] . '.',
-                1,
-            );
-        }
+        return ($files['dump'] ?? false) === true;
     }
 
     /** @param array<string, mixed> $config */
@@ -258,6 +295,25 @@ final class ImportCommand extends AppCommand
             }
             $sessionId = $this->remoteProjectConfigManager->refreshSession($remote, $config);
             $this->bitrixAdminClient->uploadFile($endpoint, $sessionId, $src, $path, $filename);
+        }
+    }
+
+    /** @param array<string, mixed> $config */
+    private function deleteDump(
+        string $remote,
+        array &$config,
+        string $endpoint,
+        string $sessionId,
+        string $path
+    ): void {
+        try {
+            $this->bitrixAdminClient->deleteFile($endpoint, $sessionId, $path);
+        } catch (\RuntimeException $error) {
+            if ($error->getMessage() !== 'REMOTE_SESSION_EXPIRED') {
+                throw $error;
+            }
+            $sessionId = $this->remoteProjectConfigManager->refreshSession($remote, $config);
+            $this->bitrixAdminClient->deleteFile($endpoint, $sessionId, $path);
         }
     }
 

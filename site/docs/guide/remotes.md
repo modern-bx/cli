@@ -16,7 +16,7 @@
 php cli.phar remote:register https://example.org prod
 ```
 
-Команда нормализует endpoint, авторизуется в `/bitrix/admin/`, сохраняет имя проекта, endpoint, учётные данные и PHPSESSID. Если кодовое имя не передано, по умолчанию используется host endpoint.
+Команда нормализует endpoint, авторизуется в `/bitrix/admin/`, сохраняет имя проекта, endpoint, учётные данные, PHPSESSID и параметры базы данных. Параметры `db.engine`, `db.host`, `db.username`, `db.password` и `db.database` автоматически читаются из ядра Bitrix и записываются в `project.yaml`. Если кодовое имя не передано, по умолчанию используется host endpoint.
 
 ## Выбор remote для сессии
 

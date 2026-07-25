@@ -6,6 +6,9 @@ namespace ModernBx\Cli\App\Console\Command\Core\Remote;
 
 use ModernBx\Cli\App\Console\Command\AppCommand;
 use ModernBx\Cli\App\Service\Remote\ProjectNameGenerator;
+use ModernBx\Cli\App\Service\Remote\BitrixAdminClient;
+use ModernBx\Cli\App\Service\Remote\RemoteConfigParameters;
+use ModernBx\Cli\App\Service\Remote\RemoteConfigPhpCodeBuilder;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputDefinition;
 use Symfony\Component\Console\Input\InputInterface;
@@ -20,10 +23,18 @@ class RegisterCommand extends AppCommand
     protected static $defaultName = 'remote:register';
 
     protected ProjectNameGenerator $projectNameGenerator;
+    private BitrixAdminClient $bitrixAdminClient;
+    private RemoteConfigPhpCodeBuilder $remoteConfigPhpCodeBuilder;
 
-    public function __construct(ProjectNameGenerator $projectNameGenerator, ?TranslatorInterface $translator = null)
-    {
+    public function __construct(
+        ProjectNameGenerator $projectNameGenerator,
+        ?TranslatorInterface $translator = null,
+        ?BitrixAdminClient $bitrixAdminClient = null,
+        ?RemoteConfigPhpCodeBuilder $remoteConfigPhpCodeBuilder = null
+    ) {
         $this->projectNameGenerator = $projectNameGenerator;
+        $this->bitrixAdminClient = $bitrixAdminClient ?? new BitrixAdminClient();
+        $this->remoteConfigPhpCodeBuilder = $remoteConfigPhpCodeBuilder ?? new RemoteConfigPhpCodeBuilder();
 
         parent::__construct($translator);
     }
@@ -32,7 +43,10 @@ class RegisterCommand extends AppCommand
     {
         $this
             ->setDescription('Регистрирует проект для удаленного управления')
-            ->setHelp('Команда авторизуется в админке проекта и сохраняет endpoint, учетные данные и PHPSESSID.')
+            ->setHelp(
+                'Команда авторизуется в админке проекта и сохраняет endpoint, учетные данные, '
+                . 'PHPSESSID и параметры базы данных.',
+            )
             ->setDefinition(
                 new InputDefinition([
                     new InputArgument(
@@ -85,7 +99,17 @@ class RegisterCommand extends AppCommand
         }
 
         $sessionCookie = $this->login($endpoint, $login, $password);
-        $this->saveProjectConfig($configFile, $projectName, $endpoint, $login, $password, $sessionCookie);
+        $this->printer->info('Получаю параметры конфигурации удаленного проекта.');
+        $options = $this->loadRemoteOptions($endpoint, $sessionCookie['value']);
+        $this->saveProjectConfig(
+            $configFile,
+            $projectName,
+            $endpoint,
+            $login,
+            $password,
+            $sessionCookie,
+            $options,
+        );
 
         $this->printer->info(sprintf('Проект зарегистрирован: %s', $projectName));
     }
@@ -306,8 +330,40 @@ class RegisterCommand extends AppCommand
         return date(DATE_ATOM, time() + (int) ini_get('session.gc_maxlifetime'));
     }
 
+    /** @return array<string, string> */
+    protected function loadRemoteOptions(string $endpoint, string $sessionId): array
+    {
+        $json = $this->bitrixAdminClient->executePhp(
+            $endpoint,
+            $sessionId,
+            $this->remoteConfigPhpCodeBuilder->build(RemoteConfigParameters::ALL),
+        );
+        $payload = json_decode($json, true);
+        $values = is_array($payload) && ($payload['ok'] ?? false) === true ? ($payload['result'] ?? null) : null;
+        if (!is_array($values) || count($values) !== count(RemoteConfigParameters::ALL)) {
+            $error = is_array($payload) && is_string($payload['error'] ?? null)
+                ? $payload['error']
+                : 'Удаленный проект вернул некорректную конфигурацию.';
+            throw new \RuntimeException($error, static::CODE_INVALID_FILE_CONTENT);
+        }
+
+        $options = [];
+        foreach (RemoteConfigParameters::ALL as $index => $name) {
+            $value = $values[$index] ?? null;
+            if (!is_scalar($value)) {
+                throw new \RuntimeException(
+                    'Удаленный проект вернул некорректное значение параметра: ' . $name,
+                    static::CODE_INVALID_FILE_CONTENT,
+                );
+            }
+            $options[$name] = (string) $value;
+        }
+        return $options;
+    }
+
     /**
      * @param array{value: string, expires: string} $sessionCookie
+     * @param array<string, string> $options
      */
     protected function saveProjectConfig(
         string $configFile,
@@ -315,7 +371,8 @@ class RegisterCommand extends AppCommand
         string $endpoint,
         string $login,
         string $password,
-        array $sessionCookie
+        array $sessionCookie,
+        array $options
     ): void {
         $dir = dirname($configFile);
 
@@ -337,6 +394,7 @@ class RegisterCommand extends AppCommand
                     'framework' => 'bitrix',
                     'language' => 'php',
                     'endpoint' => $endpoint,
+                    'options' => $options,
                     'accounts' => [
                         'default' => [
                             'login' => $login,

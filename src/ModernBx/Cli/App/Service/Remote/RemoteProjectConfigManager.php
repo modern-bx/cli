@@ -34,6 +34,26 @@ final class RemoteProjectConfigManager
 
     /**
      * @param array<string, mixed> $config
+     * @return array<string, string>
+     */
+    public function getOptions(array $config): array
+    {
+        $options = $this->getProjectConfig($config)['options'] ?? [];
+        if (!is_array($options)) {
+            return [];
+        }
+
+        $result = [];
+        foreach ($options as $name => $value) {
+            if (is_string($name) && is_scalar($value)) {
+                $result[$name] = (string) $value;
+            }
+        }
+        return $result;
+    }
+
+    /**
+     * @param array<string, mixed> $config
      */
     public function getSessionId(array $config): string
     {
