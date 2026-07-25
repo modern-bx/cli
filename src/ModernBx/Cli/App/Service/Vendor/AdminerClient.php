@@ -53,14 +53,17 @@ final class AdminerClient
         }
         $progress && $progress('Вход в базу данных через Adminer выполнен.');
 
-        $importUrl = $adminerUrl . '?' . http_build_query([
-            'server' => $dbHost,
-            'username' => $dbUser,
-            'db' => $database,
-            'import' => '',
-        ]);
+        $databaseUrl = $this->resolveDatabaseUrl(
+            $adminerUrl,
+            $login['headers'],
+            $engine,
+            $dbHost,
+            $dbUser,
+            $database,
+        );
+        $importUrl = $databaseUrl . (str_contains($databaseUrl, '?') ? '&' : '?') . 'import=';
         $importPage = $this->request('GET', $importUrl, array_merge($commonHeaders, ['Referer: ' . $adminerUrl]));
-        $this->assertSuccessful($importPage, 'Не удалось открыть страницу импорта Adminer.');
+        $this->assertImportPageSuccessful($importPage);
         $token = $this->extractToken($importPage['body']);
         $progress && $progress('Страница импорта открыта, cookie и token собраны.');
 
@@ -146,6 +149,70 @@ final class AdminerClient
     private function looksLikeLoginPage(string $body): bool
     {
         return preg_match('/name=["\']auth\[(?:username|password)\]["\']/i', $body) === 1;
+    }
+
+    /**
+     * @param string[] $headers
+     */
+    private function resolveDatabaseUrl(
+        string $adminerUrl,
+        array $headers,
+        string $engine,
+        string $dbHost,
+        string $dbUser,
+        string $database
+    ): string {
+        $location = $this->findHeader($headers, 'Location');
+        if ($location !== null) {
+            if (preg_match('#^https?://#i', $location)) {
+                return $location;
+            }
+            if (str_starts_with($location, '?')) {
+                return $adminerUrl . $location;
+            }
+            if (str_starts_with($location, '/')) {
+                $parts = parse_url($adminerUrl);
+                if (is_array($parts) && isset($parts['scheme'], $parts['host'])) {
+                    $origin = $parts['scheme'] . '://' . $parts['host'];
+                    if (isset($parts['port'])) {
+                        $origin .= ':' . $parts['port'];
+                    }
+                    return $origin . $location;
+                }
+            }
+            return rtrim(dirname($adminerUrl), '/') . '/' . ltrim($location, '/');
+        }
+
+        $serverParameter = $engine === 'pgsql' ? 'pgsql' : 'server';
+        return $adminerUrl . '?' . http_build_query([
+            $serverParameter => $dbHost,
+            'username' => $dbUser,
+            'db' => $database,
+        ]);
+    }
+
+    /** @param string[] $headers */
+    private function findHeader(array $headers, string $name): ?string
+    {
+        $value = null;
+        foreach ($headers as $header) {
+            if (preg_match('/^' . preg_quote($name, '/') . ':\s*(.+)$/i', $header, $matches)) {
+                $value = trim($matches[1]);
+            }
+        }
+        return $value;
+    }
+
+    /** @param array{status: int, headers: string[], body: string} $response */
+    private function assertImportPageSuccessful(array $response): void
+    {
+        if ($response['status'] === 403 && $this->looksLikeLoginPage($response['body'])) {
+            throw new \RuntimeException(
+                'Авторизация в базе данных Adminer не сохранилась. '
+                . 'Проверьте --db-engine, --db-host, --db-user и --db-password.',
+            );
+        }
+        $this->assertSuccessful($response, 'Не удалось открыть страницу импорта Adminer.');
     }
 
     private function extractToken(string $body): string

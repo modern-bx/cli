@@ -50,6 +50,36 @@ final class AdminerClientTest extends TestCase
         );
     }
 
+    public function testUsesCanonicalDatabaseUrlFromLoginRedirect(): void
+    {
+        self::assertSame(
+            'http://example.test/adminer.php?server=mysql&username=user&db=database&adminer_sid=session',
+            $this->invoke('resolveDatabaseUrl', [
+                'http://example.test/adminer.php',
+                ['HTTP/1.1 302 Found', 'Location: ?server=mysql&username=user&db=database&adminer_sid=session'],
+                'mysql',
+                'mysql',
+                'user',
+                'database',
+            ]),
+        );
+    }
+
+    public function testBuildsPostgresqlDatabaseUrlWithoutRedirect(): void
+    {
+        self::assertSame(
+            'http://example.test/adminer.php?pgsql=postgres&username=user&db=database',
+            $this->invoke('resolveDatabaseUrl', [
+                'http://example.test/adminer.php',
+                [],
+                'pgsql',
+                'postgres',
+                'user',
+                'database',
+            ]),
+        );
+    }
+
     /** @param mixed[] $arguments */
     private function invoke(string $methodName, array $arguments): mixed
     {
