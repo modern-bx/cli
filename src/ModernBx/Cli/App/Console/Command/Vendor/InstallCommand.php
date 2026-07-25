@@ -251,15 +251,42 @@ final class InstallCommand extends BxCommand
             [$login, password_hash($password, PASSWORD_DEFAULT)],
             $snippet,
         );
-        $content = preg_replace('/^<\?php\s*/', "<?php\n" . $snippet . "\n", $content, 1);
-        if (!is_string($content)) {
-            throw new \RuntimeException('Не удалось подшить авторизацию к adminer.');
-        }
+        $content = $this->injectAuthSnippet($content, $snippet);
         $target = tempnam(sys_get_temp_dir(), 'bx-cli-adminer-');
         if (!is_string($target) || file_put_contents($target, $content) === false) {
             throw new \RuntimeException('Не удалось подготовить временный adminer.php.');
         }
         return $target;
+    }
+
+    private function injectAuthSnippet(string $content, string $snippet): string
+    {
+        $offset = 0;
+        $insideNamespaceDeclaration = false;
+
+        foreach (token_get_all($content) as $token) {
+            $tokenText = is_array($token) ? $token[1] : $token;
+            $offset += strlen($tokenText);
+
+            if (is_array($token) && $token[0] === T_NAMESPACE) {
+                $insideNamespaceDeclaration = true;
+                continue;
+            }
+
+            if ($insideNamespaceDeclaration && ($tokenText === ';' || $tokenText === '{')) {
+                return substr_replace($content, "\n" . $snippet . "\n", $offset, 0);
+            }
+
+            if (is_array($token) && $token[0] === T_OPEN_TAG) {
+                $openTagOffset = $offset;
+            }
+        }
+
+        if (isset($openTagOffset)) {
+            return substr_replace($content, "\n" . $snippet . "\n", $openTagOffset, 0);
+        }
+
+        throw new \RuntimeException('Не удалось найти начало PHP-кода в adminer.php.');
     }
 
     private function authSnippetPath(): string
