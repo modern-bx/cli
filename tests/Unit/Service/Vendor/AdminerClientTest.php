@@ -31,6 +31,27 @@ final class AdminerClientTest extends TestCase
         ], $this->invoke('parseResultTable', [$html]));
     }
 
+    public function testParsesAdminerTableWithImplicitCellAndRowClosingTags(): void
+    {
+        $html = <<<'HTML'
+            <div class='scrollable'>
+            <table class='nowrap odds'>
+            <thead><tr><th title='int'>id<th title='varchar'>name</thead>
+            <tr><td class='number'>1<td>Alice
+            <tr><td class='number'>2<td>Bob
+            </table>
+            </div>
+            HTML;
+
+        self::assertSame([
+            'columns' => ['id', 'name'],
+            'rows' => [
+                ['1', 'Alice'],
+                ['2', 'Bob'],
+            ],
+        ], $this->invoke('parseResultTable', [$html]));
+    }
+
     public function testImportBodyRunsServerFileAndContainsToken(): void
     {
         $body = $this->invoke('buildImportBody', ['boundary', '176844:271827']);

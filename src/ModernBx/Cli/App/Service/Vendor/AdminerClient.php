@@ -249,16 +249,28 @@ final class AdminerClient
         if (!preg_match('/<table\b[^>]*>(.*?)<\/table>/is', $body, $table)) {
             throw new \RuntimeException('Adminer не вернул таблицу с результатом импорта.');
         }
-        preg_match('/<thead\b[^>]*>(.*?)<\/thead>/is', $table[1], $head);
-        preg_match_all('/<t[hd]\b[^>]*>(.*?)<\/t[hd]>/is', $head[1] ?? '', $headers);
-        preg_match('/<tbody\b[^>]*>(.*?)<\/tbody>/is', $table[1], $bodyRows);
-        preg_match_all('/<tr\b[^>]*>(.*?)<\/tr>/is', $bodyRows[1] ?? '', $rowMatches);
+        $hasHead = preg_match('/<thead\b[^>]*>(.*?)<\/thead>/is', $table[1], $head) === 1;
+        $headHtml = $hasHead ? $head[1] : '';
+        preg_match_all('/<th\b[^>]*>(.*?)(?=<th\b|<\/tr>|<\/thead>|$)/is', $headHtml, $headers);
+
+        $rowsHtml = $hasHead ? str_replace($head[0], '', $table[1]) : $table[1];
+        if (preg_match('/<tbody\b[^>]*>(.*?)<\/tbody>/is', $rowsHtml, $bodyRows)) {
+            $rowsHtml = $bodyRows[1];
+        }
+        preg_match_all('/<tr\b[^>]*>(.*?)(?=<tr\b|$)/is', $rowsHtml, $rowMatches);
         $rows = [];
         foreach ($rowMatches[1] as $row) {
-            preg_match_all('/<t[hd]\b[^>]*>(.*?)<\/t[hd]>/is', $row, $cells);
-            $rows[] = array_map([$this, 'cleanCell'], $cells[1]);
+            preg_match_all('/<td\b[^>]*>(.*?)(?=<td\b|<\/tr>|$)/is', $row, $cells);
+            if ($cells[1] !== []) {
+                $rows[] = array_map([$this, 'cleanCell'], $cells[1]);
+            }
         }
-        return ['columns' => array_map([$this, 'cleanCell'], $headers[1]), 'rows' => $rows];
+        $columns = array_map([$this, 'cleanCell'], $headers[1]);
+        if ($columns === []) {
+            throw new \RuntimeException('Adminer вернул таблицу без заголовков.');
+        }
+
+        return ['columns' => $columns, 'rows' => $rows];
     }
 
     private function cleanCell(string $cell): string
