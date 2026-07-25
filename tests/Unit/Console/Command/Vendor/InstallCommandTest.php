@@ -38,12 +38,54 @@ final class InstallCommandTest extends TestCase
         self::assertStringStartsWith("<?php \n\$authenticated = true;\n", $result);
     }
 
+    public function testRemoteInstallationLocationContainsProjectUrl(): void
+    {
+        $command = $this->createCommand();
+
+        self::assertSame(
+            'https://example.com/adminer/adminer.php',
+            $this->getInstallationLocation($command, 'https://example.com', '/adminer', 'adminer.php'),
+        );
+    }
+
+    public function testLocalInstallationLocationRemainsRelative(): void
+    {
+        $command = $this->createCommand();
+
+        self::assertSame(
+            '/adminer/adminer.php',
+            $this->getInstallationLocation($command, null, '/adminer', 'adminer.php'),
+        );
+    }
+
     private function injectAuthSnippet(string $adminer, string $snippet): string
     {
         $class = new ReflectionClass(InstallCommand::class);
         $command = $class->newInstanceWithoutConstructor();
         $method = $class->getMethod('injectAuthSnippet');
         $result = $method->invoke($command, $adminer, $snippet);
+
+        self::assertIsString($result);
+        return $result;
+    }
+
+    private function createCommand(): InstallCommand
+    {
+        $class = new ReflectionClass(InstallCommand::class);
+
+        /** @var InstallCommand $command */
+        $command = $class->newInstanceWithoutConstructor();
+        return $command;
+    }
+
+    private function getInstallationLocation(
+        InstallCommand $command,
+        ?string $endpoint,
+        string $path,
+        string $filename
+    ): string {
+        $method = (new ReflectionClass($command))->getMethod('getInstallationLocation');
+        $result = $method->invoke($command, $endpoint, $path, $filename);
 
         self::assertIsString($result);
         return $result;
