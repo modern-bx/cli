@@ -73,17 +73,20 @@ final class InstallCommand extends BxCommand
         $password = $this->generatePassword();
         $prepared = $this->prepareAdminer($cache, 'admin', $password);
 
-        if ($remote !== null) {
-            $this->uploadRemote($remote, $prepared);
-        } else {
-            parent::executeInternal($input, $output);
-            $target = rtrim($this->getDocumentRoot()->toString(), '/') . '/' . self::ADMINER_FILENAME;
-            if (file_put_contents($target, file_get_contents($prepared)) === false) {
-                throw new \RuntimeException('Не удалось записать файл: ' . $target, static::CODE_IO_ERROR);
+        try {
+            if ($remote !== null) {
+                $this->uploadRemote($remote, $prepared);
+            } else {
+                parent::executeInternal($input, $output);
+                $target = rtrim($this->getDocumentRoot()->toString(), '/') . '/' . self::ADMINER_FILENAME;
+                if (file_put_contents($target, file_get_contents($prepared)) === false) {
+                    throw new \RuntimeException('Не удалось записать файл: ' . $target, static::CODE_IO_ERROR);
+                }
             }
+        } finally {
+            @unlink($prepared);
         }
 
-        @unlink($prepared);
         return ['login' => 'admin', 'password' => $password];
     }
 
@@ -96,23 +99,57 @@ final class InstallCommand extends BxCommand
             $sessionId = $this->remoteProjectConfigManager->refreshSession($codename, $config);
         }
 
+        $temporaryFilename = '.bx-cli-adminer-' . bin2hex(random_bytes(8)) . '.tmp';
+
         try {
-            $this->bitrixAdminClient->deleteFile($endpoint, $sessionId, '/' . self::ADMINER_FILENAME);
+            $this->bitrixAdminClient->uploadFile($endpoint, $sessionId, $source, '/', $temporaryFilename);
         } catch (\RuntimeException $err) {
-            if ($err->getMessage() === 'REMOTE_SESSION_EXPIRED') {
-                $sessionId = $this->remoteProjectConfigManager->refreshSession($codename, $config);
-                $this->bitrixAdminClient->deleteFile($endpoint, $sessionId, '/' . self::ADMINER_FILENAME);
+            if ($err->getMessage() !== 'REMOTE_SESSION_EXPIRED') {
+                throw new \RuntimeException(
+                    'Не удалось загрузить временный файл Adminer: ' . $err->getMessage(),
+                    1,
+                    $err,
+                );
             }
+            $sessionId = $this->remoteProjectConfigManager->refreshSession($codename, $config);
+            $this->bitrixAdminClient->uploadFile($endpoint, $sessionId, $source, '/', $temporaryFilename);
         }
 
         try {
-            $this->bitrixAdminClient->uploadFile($endpoint, $sessionId, $source, '/', self::ADMINER_FILENAME);
+            $this->finalizeRemoteInstall($endpoint, $sessionId, $temporaryFilename);
         } catch (\RuntimeException $err) {
             if ($err->getMessage() !== 'REMOTE_SESSION_EXPIRED') {
                 throw $err;
             }
             $sessionId = $this->remoteProjectConfigManager->refreshSession($codename, $config);
-            $this->bitrixAdminClient->uploadFile($endpoint, $sessionId, $source, '/', self::ADMINER_FILENAME);
+            $this->finalizeRemoteInstall($endpoint, $sessionId, $temporaryFilename);
+        }
+    }
+
+    private function finalizeRemoteInstall(string $endpoint, string $sessionId, string $temporaryFilename): void
+    {
+        $temporaryFilename = var_export($temporaryFilename, true);
+        $adminerFilename = var_export(self::ADMINER_FILENAME, true);
+        $code = <<<PHP
+
+            \$root = rtrim((string) \$_SERVER['DOCUMENT_ROOT'], '/');
+            \$source = \$root . '/' . {$temporaryFilename};
+            \$target = \$root . '/' . {$adminerFilename};
+            \$error = null;
+            if (!is_file(\$source)) {
+                \$error = 'Временный файл Adminer не найден после загрузки.';
+            } elseif (!rename(\$source, \$target)) {
+                \$error = 'Не удалось заменить adminer.php временным файлом.';
+            }
+            echo json_encode(['ok' => \$error === null, 'error' => \$error], JSON_UNESCAPED_UNICODE);
+            PHP;
+        $result = json_decode($this->bitrixAdminClient->executePhp($endpoint, $sessionId, $code), true);
+
+        if (!is_array($result) || ($result['ok'] ?? false) !== true) {
+            $error = is_array($result) && is_string($result['error'] ?? null)
+                ? $result['error']
+                : 'Не удалось завершить установку Adminer на удаленном проекте.';
+            throw new \RuntimeException($error, 1);
         }
     }
 
