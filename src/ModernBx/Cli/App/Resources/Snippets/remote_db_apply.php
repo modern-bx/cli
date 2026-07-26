@@ -12,9 +12,11 @@ try {
 
     // @phpstan-ignore-next-line Bitrix API доступен на удаленном проекте, где выполняется сниппет.
     $connection = \Bitrix\Main\Application::getConnection();
-    RemoteDbSnippet::executeSqlBatch($connection, $sqlDump);
+    $results = RemoteDbSnippet::executeSqlBatch($connection, $sqlDump);
 
-    echo CommandResult::success(true);
+    // @phpstan-ignore-next-line Служебный класс подключается к удаленному сниппету сборщиком.
+    echo CommandResult::success($results);
 } catch (\Throwable $err) {
+    // @phpstan-ignore-next-line Служебный класс подключается к удаленному сниппету сборщиком.
     echo CommandResult::error($err->getMessage());
 }

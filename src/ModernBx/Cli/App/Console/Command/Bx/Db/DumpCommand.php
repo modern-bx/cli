@@ -57,6 +57,12 @@ class DumpCommand extends DbCommand
                         $this->trans('argument.db_dump.file'),
                     ),
                     new InputOption(
+                        'compress',
+                        null,
+                        InputOption::VALUE_REQUIRED,
+                        'Формат архива (поддерживается zip)',
+                    ),
+                    new InputOption(
                         'table',
                         null,
                         InputOption::VALUE_REQUIRED,
@@ -82,12 +88,25 @@ class DumpCommand extends DbCommand
             throw new \Exception($this->trans('error.db_dump.file_string'), static::CODE_INVALID_ARGUMENT_VALUE);
         }
 
+        if ($file !== null) {
+            $file = (string) $file;
+        }
+
+        $compress = $input->getOption('compress');
+        $compress = $this->validateCompression($compress, $file);
         $tables = $this->getTableFilter($input);
         $remote = $input->getOption('remote');
 
         if (is_string($remote)) {
             $dump = $this->executeRemote($remote, $tables);
             $this->writeDump($output, $file, $dump);
+
+            if ($file === null) {
+                return;
+            }
+
+            $createdFile = $compress !== null ? $this->compressDump($file) : $file;
+            $this->printer->info($this->trans('message.db_dump.created', ['%file%' => $createdFile]));
             return;
         }
 
@@ -114,7 +133,71 @@ class DumpCommand extends DbCommand
             return;
         }
 
-        $this->printer->info($this->trans('message.db_dump.created', ['%file%' => $file]));
+        $createdFile = $compress !== null ? $this->compressDump($file) : $file;
+        $this->printer->info($this->trans('message.db_dump.created', ['%file%' => $createdFile]));
+    }
+
+    protected function validateCompression(mixed $compress, mixed $file): ?string
+    {
+        if ($compress === null) {
+            return null;
+        }
+
+        if (!is_string($compress) || strtolower($compress) !== 'zip') {
+            throw new \Exception(
+                'Unsupported compression format. Supported formats: zip.',
+                static::CODE_INVALID_OPTION_VALUE,
+            );
+        }
+
+        if (!is_string($file) || $file === '') {
+            throw new \Exception(
+                'The dump file must be specified when using --compress.',
+                static::CODE_INVALID_ARGUMENT_VALUE,
+            );
+        }
+
+        return 'zip';
+    }
+
+    protected function compressDump(string $file): string
+    {
+        if (!class_exists('ZipArchive')) {
+            throw new \RuntimeException('PHP extension ZipArchive is not available.', static::CODE_IO_ERROR);
+        }
+
+        $archiveFile = preg_match('/\.sql$/i', $file) === 1
+            ? (string) preg_replace('/\.sql$/i', '.zip', $file)
+            : $file . '.zip';
+        $zip = new \ZipArchive();
+
+        if ($zip->open($archiveFile, \ZipArchive::CREATE | \ZipArchive::OVERWRITE) !== true) {
+            throw new \RuntimeException('Unable to create ZIP archive: ' . $archiveFile, static::CODE_IO_ERROR);
+        }
+
+        if (!$zip->addFile($file, basename($file))) {
+            $zip->close();
+            @unlink($archiveFile);
+            throw new \RuntimeException(
+                'Unable to add SQL dump to ZIP archive: ' . $archiveFile,
+                static::CODE_IO_ERROR,
+            );
+        }
+
+        if (!$zip->close()) {
+            @unlink($archiveFile);
+            throw new \RuntimeException(
+                'Unable to add SQL dump to ZIP archive: ' . $archiveFile,
+                static::CODE_IO_ERROR,
+            );
+        }
+
+        if (!unlink($file)) {
+            @unlink($archiveFile);
+            throw new \RuntimeException('Unable to remove SQL dump after compression: ' . $file, static::CODE_IO_ERROR);
+        }
+
+        return $archiveFile;
     }
 
     /** @param array<int, string>|null $tables */
@@ -130,7 +213,7 @@ class DumpCommand extends DbCommand
         return $dump;
     }
 
-    protected function writeDump(OutputInterface $output, mixed $file, string $dump): void
+    protected function writeDump(OutputInterface $output, ?string $file, string $dump): void
     {
         if ($file === null) {
             $output->write($dump);
@@ -146,8 +229,6 @@ class DumpCommand extends DbCommand
         if (file_put_contents($file, $dump) === false) {
             throw new \Exception('Unable to write dump file: ' . $file);
         }
-
-        $this->printer->info($this->trans('message.db_dump.created', ['%file%' => $file]));
     }
 
     protected function createTempDumpFile(): string
