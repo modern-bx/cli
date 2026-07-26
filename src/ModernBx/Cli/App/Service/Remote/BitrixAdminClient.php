@@ -360,7 +360,7 @@ final class BitrixAdminClient
 
     protected function extractSessid(string $body): string
     {
-        if (preg_match('/[?&]sessid=([a-f0-9]{32})/i', $body, $matches)) {
+        if (preg_match('/[?&](?:amp;)?sessid=([a-f0-9]{32})/i', $body, $matches)) {
             return $matches[1];
         }
 
@@ -369,6 +369,10 @@ final class BitrixAdminClient
         }
 
         if (preg_match('/bitrix_sessid\(\)\s*=\s*["\']([^"\']+)/i', $body, $matches)) {
+            return html_entity_decode($matches[1], ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        }
+
+        if (preg_match('/["\']?bitrix_sessid["\']?\s*:\s*["\']([^"\']+)/i', $body, $matches)) {
             return html_entity_decode($matches[1], ENT_QUOTES | ENT_HTML5, 'UTF-8');
         }
 

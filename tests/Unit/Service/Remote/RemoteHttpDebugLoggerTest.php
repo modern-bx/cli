@@ -9,7 +9,7 @@ use PHPUnit\Framework\TestCase;
 
 final class RemoteHttpDebugLoggerTest extends TestCase
 {
-    public function testWritesExchangeAndRedactsAuthenticationHeaders(): void
+    public function testWritesExchangeWithCookiesAndRedactsAuthorizationHeader(): void
     {
         $home = sys_get_temp_dir() . '/bx-cli-http-log-' . bin2hex(random_bytes(6));
 
@@ -18,7 +18,11 @@ final class RemoteHttpDebugLoggerTest extends TestCase
             $logger->write(
                 'POST',
                 'https://example.com/bitrix/admin/',
-                ['Cookie: PHPSESSID=secret-session', 'User-Agent: bx-cli remote'],
+                [
+                    'Cookie: PHPSESSID=secret-session',
+                    'Authorization: Bearer secret-token',
+                    'User-Agent: bx-cli remote',
+                ],
                 'USER_LOGIN=admin&USER_PASSWORD=%5BREDACTED%5D',
                 200,
                 ['HTTP/1.1 200 OK', 'Set-Cookie: PHPSESSID=secret-session'],
@@ -30,8 +34,10 @@ final class RemoteHttpDebugLoggerTest extends TestCase
             self::assertStringContainsString('POST https://example.com/bitrix/admin/', $contents);
             self::assertStringContainsString('HTTP status: 200', $contents);
             self::assertStringContainsString('<html>response body</html>', $contents);
-            self::assertStringContainsString('Cookie: [REDACTED]', $contents);
-            self::assertStringNotContainsString('secret-session', $contents);
+            self::assertStringContainsString('Cookie: PHPSESSID=secret-session', $contents);
+            self::assertStringContainsString('Set-Cookie: PHPSESSID=secret-session', $contents);
+            self::assertStringContainsString('Authorization: [REDACTED]', $contents);
+            self::assertStringNotContainsString('secret-token', $contents);
             self::assertSame(0600, fileperms($logger->getPath()) & 0777);
         } finally {
             $this->removeDirectory($home);

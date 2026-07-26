@@ -70,7 +70,7 @@ final class RemoteHttpDebugLogger
     private function redactHeaders(array $headers): array
     {
         return array_map(static function (string $header): string {
-            if (preg_match('/^(Cookie|Set-Cookie|Authorization):/i', $header, $matches)) {
+            if (preg_match('/^(Authorization):/i', $header, $matches)) {
                 return $matches[1] . ': [REDACTED]';
             }
 
