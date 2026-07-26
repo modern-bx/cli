@@ -68,7 +68,7 @@ final class RegisterCommandTest extends TestCase
         $tester = new CommandTester($command);
         $tester->setInputs(['admin', 'secret']);
 
-        $exitCode = $tester->execute(['endpoint' => 'https://Example.COM:8443']);
+        $exitCode = $tester->execute(['endpoint' => 'https://Example.COM:8443', '--verbose' => true]);
 
         self::assertSame(AppCommand::CODE_SUCCESS, $exitCode, $tester->getDisplay());
         self::assertFileExists($this->home . '/.config/bx-cli/projects/example.com/project.yaml');
@@ -79,6 +79,8 @@ final class RegisterCommandTest extends TestCase
         self::assertSame('https://example.com:8443', $config['data']['project']['endpoint'] ?? null);
         self::assertSame('mysql', $config['data']['project']['options']['db.engine'] ?? null);
         self::assertSame('project', $config['data']['project']['options']['db.database'] ?? null);
+        self::assertStringContainsString('Подробный HTTP-лог:', $tester->getDisplay());
+        self::assertCount(1, glob($this->home . '/.config/bx-cli/logs/remote-register-*.log') ?: []);
     }
 
     public function testUpdateUsesSavedAccessAndRefreshesProjectOptionsWithoutPrompts(): void

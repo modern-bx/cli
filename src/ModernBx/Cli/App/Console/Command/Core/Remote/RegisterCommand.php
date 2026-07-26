@@ -11,6 +11,7 @@ use ModernBx\Cli\App\Service\Remote\BitrixAdminClient;
 use ModernBx\Cli\App\Service\Remote\RemoteConfigParameters;
 use ModernBx\Cli\App\Service\Remote\RemoteConfigPhpCodeBuilder;
 use ModernBx\Cli\App\Service\Remote\RemoteProjectConfigManager;
+use ModernBx\Cli\App\Service\Remote\RemoteHttpDebugLogger;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputDefinition;
 use Symfony\Component\Console\Input\InputInterface;
@@ -83,6 +84,10 @@ class RegisterCommand extends AppCommand
     {
         parent::executeInternal($input, $output);
 
+        if ($this->isVerbose()) {
+            $this->enableHttpDebugLog();
+        }
+
         if ($input->getOption('update')) {
             $this->updateProject($input);
             return;
@@ -135,6 +140,32 @@ class RegisterCommand extends AppCommand
         );
 
         $this->printer->info(sprintf('Проект зарегистрирован: %s', $projectName));
+    }
+
+    private function enableHttpDebugLog(): void
+    {
+        $logger = new RemoteHttpDebugLogger();
+        $this->printer->info(sprintf('Подробный HTTP-лог: %s', $logger->getPath()));
+        $this->bitrixAdminClient->setDebugLogger(function (
+            string $method,
+            string $url,
+            array $requestHeaders,
+            string $requestBody,
+            int $status,
+            array $responseHeaders,
+            string $responseBody
+        ) use ($logger): void {
+            $logger->write(
+                $method,
+                $url,
+                $requestHeaders,
+                $requestBody,
+                $status,
+                $responseHeaders,
+                $responseBody,
+            );
+            $this->printer->info(sprintf('HTTP %s %s -> %d', $method, $url, $status));
+        });
     }
 
     private function updateProject(InputInterface $input): void
