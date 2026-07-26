@@ -114,7 +114,9 @@ class ApplyCommand extends DbCommand
             }
         }
 
-        $this->printer->info($this->trans('message.db_apply.applied', ['%file%' => $file ?? 'stdin']));
+        if ($this->shouldPrintCompletionMessage($format)) {
+            $this->printer->info($this->trans('message.db_apply.applied', ['%file%' => $file ?? 'stdin']));
+        }
     }
 
     /**
@@ -167,6 +169,14 @@ class ApplyCommand extends DbCommand
                 throw new \Exception('Unable to read SQL file: ' . $path);
             }
             $scripts[] = ['name' => $this->relativePath($path, $file), 'sql' => $sql];
+        }
+
+        if (count($scripts) === 1 && is_string($scripts[0]['name'])) {
+            $scripts[0]['name'] = (string) preg_replace(
+                '#^(?:.*/)?[^/]+\.zip/(.+)$#i',
+                '$1',
+                $scripts[0]['name'],
+            );
         }
 
         return $scripts;
@@ -277,6 +287,11 @@ class ApplyCommand extends DbCommand
         $zip->close();
 
         return $sql;
+    }
+
+    protected function shouldPrintCompletionMessage(string $format): bool
+    {
+        return $format === 'table';
     }
 
     protected function getOutputFormat(mixed $format): string

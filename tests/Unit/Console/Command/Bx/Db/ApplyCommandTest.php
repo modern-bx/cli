@@ -45,6 +45,30 @@ final class ApplyCommandTest extends TestCase
         $this->invoke('getOutputFormat', ['xml']);
     }
 
+    public function testCompletionMessageIsOnlyPrintedForTableFormat(): void
+    {
+        self::assertTrue($this->invoke('shouldPrintCompletionMessage', ['table']));
+        self::assertFalse($this->invoke('shouldPrintCompletionMessage', ['json']));
+        self::assertFalse($this->invoke('shouldPrintCompletionMessage', ['csv']));
+    }
+
+    public function testSingleSqlFileInArchiveDoesNotIncludeArchiveName(): void
+    {
+        $directory = $this->createDirectory();
+        $archive = new \ZipArchive();
+        self::assertTrue($archive->open($directory . '/dump.zip', \ZipArchive::CREATE));
+        $archive->addFromString('only.sql', 'SELECT 1;');
+        $archive->close();
+
+        try {
+            $scripts = $this->invoke('readSqlScripts', [$directory . '/dump.zip']);
+            self::assertIsArray($scripts);
+            self::assertSame(['only.sql'], array_column($scripts, 'name'));
+        } finally {
+            $this->removeDirectory($directory);
+        }
+    }
+
     public function testReadsSqlFilesFromDirectoryAndZipInNameOrder(): void
     {
         $directory = $this->createDirectory();
