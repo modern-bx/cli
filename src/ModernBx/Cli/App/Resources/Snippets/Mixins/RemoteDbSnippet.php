@@ -4,10 +4,14 @@
 
 final class RemoteDbSnippet
 {
-    /** @return array<int, string> */
+    /**
+     * @param array<int, string>|null $filter
+     * @return array<int, string>
+     */
     public static function getTables(object $connection, ?array $filter = null): array
     {
         $tables = [];
+        // @phpstan-ignore-next-line Bitrix database connection API.
         $result = $connection->query(
             self::isMysql($connection)
                 ? "SHOW FULL TABLES WHERE Table_type = 'BASE TABLE'"
@@ -51,14 +55,45 @@ final class RemoteDbSnippet
             $value = '';
         }
 
+        // @phpstan-ignore-next-line Bitrix database connection API.
         return "'" . $connection->getSqlHelper()->forSql((string) $value) . "'";
     }
 
-    public static function executeSqlBatch(object $connection, string $sql): void
+    /** @return array<int, array{columns: array<int, string>, rows: array<int, array<int, string|null>>}> */
+    public static function executeSqlBatch(object $connection, string $sql): array
     {
+        $results = [];
+
         foreach (self::splitSqlStatements($sql) as $statement) {
-            $connection->queryExecute($statement);
+            if (preg_match('/^\s*(SELECT|SHOW|DESCRIBE|DESC|EXPLAIN|WITH)\b/i', $statement) !== 1) {
+                // @phpstan-ignore-next-line Bitrix database connection API.
+                $connection->queryExecute($statement);
+                continue;
+            }
+
+            // @phpstan-ignore-next-line Bitrix database connection API.
+            $queryResult = $connection->query($statement);
+            $rows = [];
+            $columns = [];
+
+            while ($row = $queryResult->fetch()) {
+                if ($columns === []) {
+                    $columns = array_map('strval', array_keys($row));
+                }
+                $rows[] = array_map(
+                    static fn (mixed $value): ?string => $value === null
+                        ? null
+                        : (is_scalar($value) ? (string) $value : ''),
+                    array_values($row)
+                );
+            }
+
+            if ($columns !== []) {
+                $results[] = ['columns' => $columns, 'rows' => $rows];
+            }
         }
+
+        return $results;
     }
 
     /** @return array<int, string> */

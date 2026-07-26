@@ -7,9 +7,44 @@ namespace ModernBx\Cli\Tests\Unit\Console\Command\Bx\Db;
 use ModernBx\Cli\App\Console\Command\Bx\Db\ApplyCommand;
 use PHPUnit\Framework\TestCase;
 use ReflectionClass;
+use Symfony\Component\Console\Output\BufferedOutput;
 
 final class ApplyCommandTest extends TestCase
 {
+    public function testDefinesOutputOptionsWithTableDefault(): void
+    {
+        $reflection = new ReflectionClass(ApplyCommand::class);
+        $command = $reflection->newInstanceWithoutConstructor();
+        $parent = $reflection->getParentClass();
+        self::assertInstanceOf(ReflectionClass::class, $parent);
+        $grandparent = $parent->getParentClass();
+        self::assertInstanceOf(ReflectionClass::class, $grandparent);
+        $grandparent->getMethod('__construct')->invoke($command);
+        $reflection->getMethod('configure')->invoke($command);
+
+        self::assertSame('table', $command->getDefinition()->getOption('format')->getDefault());
+        self::assertTrue($command->getDefinition()->hasOption('void'));
+    }
+
+    public function testRendersJsonAndCsvResults(): void
+    {
+        $results = [['columns' => ['id', 'name'], 'rows' => [['1', 'test']]]];
+        $jsonOutput = new BufferedOutput();
+        $csvOutput = new BufferedOutput();
+
+        $this->invoke('renderResults', [$jsonOutput, 'json', $results]);
+        $this->invoke('renderResults', [$csvOutput, 'csv', $results]);
+
+        self::assertStringContainsString('"columns"', $jsonOutput->fetch());
+        self::assertSame("id,name\n1,test\n", $csvOutput->fetch());
+    }
+
+    public function testRejectsUnknownOutputFormat(): void
+    {
+        $this->expectException(\RuntimeException::class);
+        $this->invoke('getOutputFormat', ['xml']);
+    }
+
     public function testReadsSqlFilesFromDirectoryAndZipInNameOrder(): void
     {
         $directory = $this->createDirectory();
@@ -24,6 +59,9 @@ final class ApplyCommandTest extends TestCase
         $archive->close();
 
         try {
+            $scripts = $this->invoke('readSqlScripts', [$directory]);
+            self::assertIsArray($scripts);
+            self::assertSame(['01.sql', '02.zip/10.sql', '02.zip/20.sql'], array_column($scripts, 'name'));
             self::assertSame(
                 "directory-first;\narchive-first;\narchive-second;",
                 $this->invoke('readSql', [$directory]),
