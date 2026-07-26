@@ -6,6 +6,17 @@ namespace ModernBx\Cli\App\Service\Remote;
 
 final class BitrixAdminClient
 {
+    /** @var null|callable(string, string, string[], string, int, string[], string): void */
+    private $debugLogger = null;
+
+    /**
+     * @param null|callable(string, string, string[], string, int, string[], string): void $logger
+     */
+    public function setDebugLogger(?callable $logger): void
+    {
+        $this->debugLogger = $logger;
+    }
+
     /**
      * @return array{value: string, expires: string}
      */
@@ -349,7 +360,7 @@ final class BitrixAdminClient
 
     protected function extractSessid(string $body): string
     {
-        if (preg_match('/[?&]sessid=([a-f0-9]{32})/i', $body, $matches)) {
+        if (preg_match('/[?&](?:amp;)?sessid=([a-f0-9]{32})/i', $body, $matches)) {
             return $matches[1];
         }
 
@@ -358,6 +369,10 @@ final class BitrixAdminClient
         }
 
         if (preg_match('/bitrix_sessid\(\)\s*=\s*["\']([^"\']+)/i', $body, $matches)) {
+            return html_entity_decode($matches[1], ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        }
+
+        if (preg_match('/["\']?bitrix_sessid["\']?\s*:\s*["\']([^"\']+)/i', $body, $matches)) {
             return html_entity_decode($matches[1], ENT_QUOTES | ENT_HTML5, 'UTF-8');
         }
 
@@ -676,6 +691,8 @@ final class BitrixAdminClient
             throw new \RuntimeException('Не удалось выполнить HTTP-запрос к удаленному проекту.');
         }
 
+        $this->logHttpExchange('GET', $url, $headers, '', $status, $responseHeaders, $response);
+
         return [
             'status' => $status,
             'headers' => $responseHeaders,
@@ -908,6 +925,13 @@ final class BitrixAdminClient
     protected function post(string $url, array $data, array $extraHeaders = []): array
     {
         $body = http_build_query($data);
+        $logData = $data;
+        foreach (['USER_PASSWORD', 'password'] as $sensitiveField) {
+            if (array_key_exists($sensitiveField, $logData)) {
+                $logData[$sensitiveField] = '[REDACTED]';
+            }
+        }
+        $logBody = http_build_query($logData);
         $headers = array_merge([
             'Content-Type: application/x-www-form-urlencoded',
             'Content-Length: ' . strlen($body),
@@ -933,11 +957,41 @@ final class BitrixAdminClient
             throw new \RuntimeException('Не удалось выполнить HTTP-запрос к удаленному проекту.');
         }
 
+        $this->logHttpExchange('POST', $url, $headers, $logBody, $status, $responseHeaders, $response);
+
         return [
             'status' => $status,
             'headers' => $responseHeaders,
             'body' => $response,
         ];
+    }
+
+    /**
+     * @param string[] $requestHeaders
+     * @param string[] $responseHeaders
+     */
+    private function logHttpExchange(
+        string $method,
+        string $url,
+        array $requestHeaders,
+        string $requestBody,
+        int $status,
+        array $responseHeaders,
+        string $responseBody
+    ): void {
+        if ($this->debugLogger === null) {
+            return;
+        }
+
+        ($this->debugLogger)(
+            $method,
+            $url,
+            $requestHeaders,
+            $requestBody,
+            $status,
+            $responseHeaders,
+            $responseBody,
+        );
     }
 
     /**

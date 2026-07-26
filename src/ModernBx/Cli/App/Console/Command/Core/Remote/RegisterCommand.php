@@ -11,6 +11,7 @@ use ModernBx\Cli\App\Service\Remote\BitrixAdminClient;
 use ModernBx\Cli\App\Service\Remote\RemoteConfigParameters;
 use ModernBx\Cli\App\Service\Remote\RemoteConfigPhpCodeBuilder;
 use ModernBx\Cli\App\Service\Remote\RemoteProjectConfigManager;
+use ModernBx\Cli\App\Service\Remote\RemoteHttpDebugLogger;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputDefinition;
 use Symfony\Component\Console\Input\InputInterface;
@@ -83,6 +84,10 @@ class RegisterCommand extends AppCommand
     {
         parent::executeInternal($input, $output);
 
+        if ($this->isVerbose()) {
+            $this->enableHttpDebugLog();
+        }
+
         if ($input->getOption('update')) {
             $this->updateProject($input);
             return;
@@ -135,6 +140,32 @@ class RegisterCommand extends AppCommand
         );
 
         $this->printer->info(sprintf('Проект зарегистрирован: %s', $projectName));
+    }
+
+    private function enableHttpDebugLog(): void
+    {
+        $logger = new RemoteHttpDebugLogger();
+        $this->printer->info(sprintf('Подробный HTTP-лог: %s', $logger->getPath()));
+        $this->bitrixAdminClient->setDebugLogger(function (
+            string $method,
+            string $url,
+            array $requestHeaders,
+            string $requestBody,
+            int $status,
+            array $responseHeaders,
+            string $responseBody
+        ) use ($logger): void {
+            $logger->write(
+                $method,
+                $url,
+                $requestHeaders,
+                $requestBody,
+                $status,
+                $responseHeaders,
+                $responseBody,
+            );
+            $this->printer->info(sprintf('HTTP %s %s -> %d', $method, $url, $status));
+        });
     }
 
     private function updateProject(InputInterface $input): void
@@ -288,112 +319,7 @@ class RegisterCommand extends AppCommand
      */
     protected function login(string $endpoint, string $login, string $password): array
     {
-        $url = $endpoint . '/bitrix/admin/';
-        $body = http_build_query([
-            'AUTH_FORM' => 'Y',
-            'TYPE' => 'AUTH',
-            'backurl' => '/bitrix/admin/',
-            'USER_LOGIN' => $login,
-            'USER_PASSWORD' => $password,
-            'Login' => 'Y',
-        ]);
-
-        $headers = [
-            'Content-Type: application/x-www-form-urlencoded',
-            'Content-Length: ' . strlen($body),
-            'User-Agent: bx-cli remote:register',
-        ];
-
-        $context = stream_context_create([
-            'http' => [
-                'method' => 'POST',
-                'header' => implode("\r\n", $headers),
-                'content' => $body,
-                'ignore_errors' => true,
-                'follow_location' => 0,
-                'timeout' => 30,
-            ],
-        ]);
-
-        $response = @file_get_contents($url, false, $context);
-        $responseHeaders = $http_response_header;
-
-        $statusCode = $this->getStatusCode($responseHeaders);
-
-        if ($response === false || $statusCode === null || $statusCode < 200 || $statusCode >= 400) {
-            throw new \RuntimeException('Не удалось авторизоваться в админке проекта.', static::CODE_IO_ERROR);
-        }
-
-        $sessionCookie = $this->extractPhpSessionIdCookie($responseHeaders);
-
-        if ($sessionCookie === null) {
-            throw new \RuntimeException('Авторизация не вернула PHPSESSID.', static::CODE_IO_ERROR);
-        }
-
-        if ($statusCode < 300 && $this->looksLikeLoginForm($response)) {
-            throw new \RuntimeException('Неверный логин или пароль администратора.', static::CODE_IO_ERROR);
-        }
-
-        return $sessionCookie;
-    }
-
-    /**
-     * @param string[] $headers
-     */
-    protected function getStatusCode(array $headers): ?int
-    {
-        foreach ($headers as $header) {
-            if (preg_match('/^HTTP\/\S+\s+(\d{3})/', $header, $matches)) {
-                return (int) $matches[1];
-            }
-        }
-
-        return null;
-    }
-
-    protected function looksLikeLoginForm(string $response): bool
-    {
-        return str_contains($response, 'name="AUTH_FORM"')
-            || str_contains($response, "name='AUTH_FORM'")
-            || str_contains($response, 'name="USER_LOGIN"')
-            || str_contains($response, "name='USER_LOGIN'");
-    }
-
-    /**
-     * @param string[] $headers
-     * @return array{value: string, expires: string}|null
-     */
-    protected function extractPhpSessionIdCookie(array $headers): ?array
-    {
-        foreach ($headers as $header) {
-            if (!preg_match('/^Set-Cookie:\s*PHPSESSID=([^;]+)/i', $header, $matches)) {
-                continue;
-            }
-
-            return [
-                'value' => urldecode($matches[1]),
-                'expires' => $this->extractCookieExpires($header),
-            ];
-        }
-
-        return null;
-    }
-
-    protected function extractCookieExpires(string $setCookieHeader): string
-    {
-        if (preg_match('/;\s*expires=([^;]+)/i', $setCookieHeader, $matches)) {
-            $timestamp = strtotime($matches[1]);
-
-            if ($timestamp !== false) {
-                return date(DATE_ATOM, $timestamp);
-            }
-        }
-
-        if (preg_match('/;\s*max-age=(\d+)/i', $setCookieHeader, $matches)) {
-            return date(DATE_ATOM, time() + (int) $matches[1]);
-        }
-
-        return date(DATE_ATOM, time() + (int) ini_get('session.gc_maxlifetime'));
+        return $this->bitrixAdminClient->login($endpoint, $login, $password);
     }
 
     /** @return array<string, string> */

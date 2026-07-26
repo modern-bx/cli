@@ -22,23 +22,30 @@ echo 'select * from b_user' | php cli.phar db:exec --remote=prod --page=1 --size
 - `--size` — размер страницы, по умолчанию `100`.
 - `--php` — выполнить удалённый SQL через PHP-консоль.
 
-## `db:dump [--remote=<codename>] [--local] [file] [--table=<tables>]`
+## `db:dump [--remote=<codename>] [--local] [--compress=zip] [file] [--table=<tables>]`
 
 Создаёт SQL-дамп базы в файл или, если файл не указан, в stdout. Можно ограничить набор таблиц через `--table`; список задаётся через запятую, для PostgreSQL допустим формат `schema.table`. С `--remote` дамп формируется на зарегистрированном удалённом проекте через PHP-консоль админки и затем сохраняется в локальный файл или выводится в stdout.
+
+Опция `--compress=zip` упаковывает дамп в ZIP. Для локального и удалённого режима требуется PHP-расширение `ZipArchive`, а аргумент `file` становится обязательным. Для имени с расширением `.sql` архив получает такое же имя с расширением `.zip`; в остальных случаях `.zip` добавляется к имени.
 
 ```bash
 php cli.phar db:dump var/backup.sql
 php cli.phar db:dump var/users.sql --table=b_user,b_user_group
 php cli.phar db:dump --remote=prod var/prod.sql --table=b_user
+php cli.phar db:dump --remote=prod --compress=zip var/prod.sql
 ```
 
-## `db:apply [--remote=<codename>] [--local] [file]`
+## `db:apply [--remote=<codename>] [--local] [--format=table|json|csv] [--void] [file]`
 
-Выполняет SQL-файл или, если файл не указан, SQL из stdin в базе проекта. Если stdin пустой, команда завершается с предупреждением. Команда подходит для восстановления дампа или применения подготовленного SQL-скрипта. С `--remote` локальный SQL-файл отправляется и выполняется на зарегистрированном удалённом проекте через PHP-консоль админки.
+Выполняет SQL-файл или, если файл не указан, SQL из stdin в базе проекта. Аргументом также может быть директория или glob-выражение с файлами `.sql` и `.zip`. Из ZIP читаются SQL-файлы верхнего уровня, после чего все найденные скрипты выполняются по порядку. Если stdin пустой, команда завершается с предупреждением. С `--remote` скрипты выполняются на зарегистрированном проекте через PHP-консоль админки.
+
+Результаты каждого SQL-скрипта выводятся таблицами. `--format=json` и `--format=csv` переключают формат, а `--void` полностью отключает вывод результатов. Для запросов без результирующего набора выводится число затронутых строк.
 
 ```bash
 php cli.phar db:apply var/backup.sql
 php cli.phar db:apply --remote=prod var/backup.sql
+php cli.phar db:apply --remote=prod --format=json var/backup.zip
+php cli.phar db:apply --void var/migrations.sql
 cat var/backup.sql | php cli.phar db:apply --remote=prod
 ```
 

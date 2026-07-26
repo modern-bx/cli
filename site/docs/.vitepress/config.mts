@@ -39,6 +39,7 @@ export default defineConfig({
           { text: 'Bitrix', link: '/commands/bitrix' },
           { text: 'Резервные копии', link: '/commands/backup' },
           { text: 'База данных', link: '/commands/database' },
+          { text: 'Vendor и Adminer', link: '/commands/vendor' },
           { text: 'Файлы', link: '/commands/files' },
           { text: 'JSON и dotenv', link: '/commands/data' },
           { text: 'Remote и сессии', link: '/commands/remote' },

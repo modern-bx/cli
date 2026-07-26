@@ -2,13 +2,17 @@
 
 Remote-команды управляют списком зарегистрированных удалённых Bitrix-проектов и выбором проекта для текущей shell-сессии.
 
-## `remote:register <endpoint> [codename]`
+## `remote:register [--update] [-v|--verbose] <endpoint> [codename]`
 
 Регистрирует удалённый проект. Команда авторизуется в админке, сохраняет endpoint, учётные данные и PHPSESSID. Если `codename` не передан, по умолчанию используется host endpoint. Если такой код уже занят или host не подходит под правила имени, имя генерируется автоматически.
 
 ```bash
 php cli.phar remote:register https://example.org prod
+php cli.phar remote:register --update prod
+php cli.phar remote:register -v https://example.org prod
 ```
+
+`--update` повторно получает параметры проекта, используя сохранённые доступы. В verbose-режиме команда печатает статусы HTTP-запросов и сохраняет их полные запросы и ответы в `~/.config/bx-cli/logs/remote-register-*.log`. Лог создаётся с правами `0600`, содержит `Cookie`/`Set-Cookie`, но скрывает пароль формы авторизации и заголовок `Authorization`.
 
 Правила имени: латинские буквы в нижнем регистре, цифры, точки, подчёркивания и дефисы; имя должно начинаться с буквы или цифры.
 
@@ -34,6 +38,23 @@ php cli.phar remote:rename prod stage
 
 ```bash
 php cli.phar remote:delete prod
+```
+
+## `remote:show <codename>`
+
+Выводит сохранённую YAML-конфигурацию проекта, включая endpoint, аккаунт, cookies и параметры базы данных.
+
+```bash
+php cli.phar remote:show prod
+```
+
+## `remote:config-get <parameter[,parameter...]>`
+
+Читает актуальные параметры конфигурации из Bitrix текущего remote, выбранного через `session:remote`. Поддерживаются `db.engine`, `db.host`, `db.username`, `db.password` и `db.database`.
+
+```bash
+eval "$(php cli.phar session:remote prod)"
+php cli.phar remote:config-get db.engine,db.host,db.database
 ```
 
 ## `session:remote [--unset] [remote]`

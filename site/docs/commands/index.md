@@ -23,6 +23,12 @@
 - `db:apply` — применяет SQL-файл.
 - `db:wipe` — очищает таблицы.
 
+## Vendor и Adminer
+
+- `vendor:get-installer` — скачивает дистрибутив 1С-Битрикс или 1С-Битрикс24.
+- `vendor:install`, `vendor:uninstall` — устанавливают и удаляют Adminer локально или на remote.
+- `adminer:import` — загружает и импортирует SQL-дамп в удалённую базу через Adminer.
+
 ## CFile
 
 - `cfile:save` — создаёт запись в `b_file` для существующего файла.
@@ -47,5 +53,6 @@
 
 ## Remote
 
-- `remote:register`, `remote:list`, `remote:rename`, `remote:delete` — управляют registry удалённых проектов.
+- `remote:register`, `remote:list`, `remote:rename`, `remote:delete`, `remote:show` — управляют registry удалённых проектов.
+- `remote:config-get` — читает параметры конфигурации текущего remote.
 - `session:remote` — печатает shell-команду для выбора remote в текущей терминальной сессии.
