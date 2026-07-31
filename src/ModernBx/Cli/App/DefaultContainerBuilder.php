@@ -30,6 +30,7 @@ use ModernBx\Cli\App\Service\Remote\RemoteOptionPhpCodeBuilder;
 use ModernBx\Cli\App\Service\Remote\RemoteSettingPhpCodeBuilder;
 use ModernBx\Cli\App\Service\Remote\RemoteSitePhpCodeBuilder;
 use ModernBx\Cli\App\Service\Remote\RemoteSqlPhpCodeBuilder;
+use ModernBx\Cli\App\Service\Remote\RemoteUserPhpCodeBuilder;
 use ModernBx\Cli\App\Service\Db\MySqlDumper;
 use ModernBx\Cli\App\Service\Db\MySqlExecutor;
 use ModernBx\Cli\App\Service\Db\PgSqlDumper;
@@ -156,6 +157,9 @@ final class DefaultContainerBuilder
 
         $this->containerBuilder
             ->autowire(RemoteSitePhpCodeBuilder::class, RemoteSitePhpCodeBuilder::class);
+
+        $this->containerBuilder
+            ->autowire(RemoteUserPhpCodeBuilder::class, RemoteUserPhpCodeBuilder::class);
 
         $runtimeInfo = $this->containerBuilder
             ->autowire(RuntimeInfo::class, RuntimeInfo::class);
