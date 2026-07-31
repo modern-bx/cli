@@ -135,12 +135,8 @@ final class PasswordSetCommand extends KernelCommand
 
     private function updateLocal(string $field, string $value, string $password): void
     {
-        // CUser intentionally stays a string here. A direct class reference is rewritten by PHP-Scoper and makes
-        // the scoped alias take part in loading the Bitrix prologue. Some Bitrix versions then fail while parsing
-        // include.php, which breaks every local command before this method is even called.
-        $userClass = implode('', ['C', 'User']);
-
-        $users = $userClass::GetList($by = 'id', $order = 'asc', [$field => $value], ['FIELDS' => ['ID']]);
+        /** @phpstan-ignore-next-line */
+        $users = \CUser::GetList($by = 'id', $order = 'asc', [$field => $value], ['FIELDS' => ['ID']]);
         $user = $users->Fetch();
 
         if (!is_array($user) || !isset($user['ID'])) {
@@ -148,9 +144,11 @@ final class PasswordSetCommand extends KernelCommand
         }
 
         /** @phpstan-ignore-next-line */
-        $updater = new $userClass();
+        $updater = new \CUser();
 
+        /** @phpstan-ignore-next-line */
         if (!$updater->Update((int) $user['ID'], ['PASSWORD' => $password, 'CONFIRM_PASSWORD' => $password])) {
+            /** @phpstan-ignore-next-line */
             throw new \RuntimeException($updater->LAST_ERROR ?: 'Не удалось изменить пароль пользователя.');
         }
     }
